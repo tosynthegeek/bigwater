@@ -1,0 +1,28 @@
+{
+  "name": "bigwater_backend",
+  "module": "index.ts",
+  "type": "module",
+  "private": true,
+  "devDependencies": {
+    "@types/bun": "latest",
+    "@types/node-telegram-bot-api": "^0.64.15",
+    "@types/ws": "^8.18.1"
+  },
+  "peerDependencies": {
+    "typescript": "^5"
+  },
+  "dependencies": {
+    "bullmq": "^5.79.2",
+    "dotenv": "^17.4.2",
+    "drizzle-kit": "^0.31.10",
+    "drizzle-orm": "^0.45.2",
+    "hono": "^4.12.27",
+    "ioredis": "^5.11.1",
+    "nanoid": "^5.1.16",
+    "node-telegram-bot-api": "^1.1.2",
+    "pg": "^8.22.0",
+    "postgres": "^3.4.9",
+    "ws": "^8.21.0",
+    "zod": "^4.4.3"
+  }
+}
