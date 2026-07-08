@@ -1,0 +1,45 @@
+services:
+  postgres:
+    image: postgres:17-alpine
+    container_name: bigwater-postgres
+    ports:
+      - '5433:5432'
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  redis:
+    image: redis:alpine
+    container_name: bigwater-redis
+    ports:
+      - '6379:6379'
+    command:
+      [
+        'redis-server',
+        '--requirepass',
+        '${REDIS_PASSWORD}',
+        '--save',
+        '60',
+        '1',
+        '--appendonly',
+        'yes',
+        '--appendfsync',
+        'everysec',
+        '--loglevel',
+        'warning',
+      ]
+    environment:
+      REDIS_PASSWORD: ${REDIS_PASSWORD}
+    volumes:
+      - redis_data:/data
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
