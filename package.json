@@ -11,12 +11,14 @@
     "typescript": "^5"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1082.0",
     "@bull-board/api": "^8.1.0",
     "@bull-board/hono": "^8.1.0",
     "@grammyjs/conversations": "^2.1.1",
     "@grammyjs/storage-redis": "^2.5.1",
     "@privy-io/node": "^0.24.0",
     "bullmq": "^5.79.2",
+    "date-fns": "^4.4.0",
     "dotenv": "^17.4.2",
     "drizzle-kit": "^0.31.10",
     "drizzle-orm": "^0.45.2",
@@ -26,6 +28,7 @@
     "nanoid": "^5.1.16",
     "pg": "^8.22.0",
     "postgres": "^3.4.9",
+    "uuid": "^14.0.1",
     "ws": "^8.21.0",
     "zod": "^4.4.3"
   },
