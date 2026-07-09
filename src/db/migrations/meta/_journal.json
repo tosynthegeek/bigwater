@@ -8,6 +8,13 @@
       "when": 1783516214364,
       "tag": "0000_narrow_warlock",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1783587622994,
+      "tag": "0001_fearless_pestilence",
+      "breakpoints": true
     }
   ]
 }

@@ -14,6 +14,11 @@ const envSchema = z.object({
   PRIVY_APP_ID: z.string(),
   PRIVY_APP_SECRET: z.string(),
   TELEGRAM_BOT_TOKEN: z.string(),
+  AWS_BUCKET_NAME: z.string(),
+  AWS_BUCKET_REGION: z.string(),
+  AWS_ACCESS_KEY: z.string(),
+  AWS_ACCESS_SECRET: z.string(),
+  AWS_CLOUDFRONT_URL: z.string(),
 });
 
 export default function parseEnv() {

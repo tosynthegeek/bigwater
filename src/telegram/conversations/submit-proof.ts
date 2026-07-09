@@ -1,7 +1,6 @@
 import { resolveUserByTelegramId } from "@/services/identity";
+import { createTelegramSubmission } from "@/services/submissions/telegram-submissions";
 import type { BotContext, BotConversation } from "@/telegram/bot";
-// import { createSubmission } from "@/services/submissions"; // TODO: F4 — not built yet
-
 
 export async function submitProofConversation(
   conversation: BotConversation,
@@ -29,13 +28,18 @@ export async function submitProofConversation(
   );
 
   const photoCtx = await conversation.waitFor("message:photo");
-  const photo = photoCtx.message.photo.at(-1); // highest-res size
+  const photo = photoCtx.message.photo.at(-1);
 
-  // await conversation.external(() =>
-  //   createSubmission({ userId: user.id, taskIdOrCustom, fileId: photo?.file_id })
-  // );
+  if (!photo?.file_id) {
+    await ctx.reply("I couldn't read the photo. Try sending it again.");
+    return;
+  }
+
+  await conversation.external(() =>
+    createTelegramSubmission(photo.file_id, user.id, taskIdOrCustom),
+  );
 
   await ctx.reply(
-    "Got your photo! Submission processing isn't wired up yet on this build — coming with F4.",
+    "Got your photo! Submission is queued for verification. You'll be notified once it's processed.",
   );
 }

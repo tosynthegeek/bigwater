@@ -47,3 +47,53 @@ export async function createTelegramLinkCode(c: Context) {
     return c.json({ error: "Internal server error" }, 500);
   }
 }
+
+export async function getParticipantProfile(c: Context) {
+  const user = c.get("user") as User;
+
+  if (!user) {
+    return c.json({ error: "User not found" }, 404);
+  }
+
+  try {
+    const [profile] = await db
+      .select()
+      .from(participantProfile)
+      .where(eq(participantProfile.userId, user.id));
+
+    if (!profile) {
+      return c.json({ error: "Profile not found" }, 404);
+    }
+
+    return c.json({ profile }, 200);
+  } catch (error) {
+    console.error(
+      "Identity.Controllers.participants-controllers.getParticipantProfile.error: ",
+      error,
+    );
+    return c.json({ error: "Internal server error" }, 500);
+  }
+}
+
+export async function getParticipantSubmissions(c: Context) {
+  const user = c.get("user") as User;
+
+  if (!user) {
+    return c.json({ error: "User not found" }, 404);
+  }
+
+  try {
+    const submissions = await db.query.submissions.findMany({
+      where: (submissions, { eq }) => eq(submissions.userId, user.id),
+      orderBy: (submissions, { desc }) => desc(submissions.createdAt),
+    });
+
+    return c.json({ submissions }, 200);
+  } catch (error) {
+    console.error(
+      "Identity.Controllers.participants-controllers.getParticipantSubmissions.error: ",
+      error,
+    );
+    return c.json({ error: "Internal server error" }, 500);
+  }
+}
