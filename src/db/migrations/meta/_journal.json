@@ -15,6 +15,13 @@
       "when": 1783587622994,
       "tag": "0001_fearless_pestilence",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1783677449419,
+      "tag": "0002_spicy_ultimates",
+      "breakpoints": true
     }
   ]
 }
