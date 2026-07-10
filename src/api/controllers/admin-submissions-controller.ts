@@ -5,8 +5,9 @@ import { db } from "@/db";
 import { submissions, tasks } from "@/db/schema/bigwater";
 import { eq } from "drizzle-orm";
 import { updateUserStreak } from "@/services/economy/streaks";
+import { updateCustomSubmissionSchema } from "@/zod/submission";
 
-export async function updateSubmissionStatus(c: Context) {
+export async function reviewSubmission(c: Context) {
   const user = c.get("user");
   if (!user || typeof user.id !== "string") {
     return c.json({ error: "Unauthorized" }, 401);
@@ -21,7 +22,7 @@ export async function updateSubmissionStatus(c: Context) {
   const status = body.status;
   const taskId = body.taskId;
 
-  const validStatuses = ["pending", "under_review", "approved", "rejected"];
+  const validStatuses = ["approved", "rejected"];
   if (!validStatuses.includes(status)) {
     return c.json(
       { error: `status must be one of: ${validStatuses.join(", ")}` },
@@ -55,7 +56,7 @@ export async function updateSubmissionStatus(c: Context) {
 
       let awardedPoints = submission.basePoints;
 
-      if (!submission.taskId) {
+      if (!submission.taskId || submission.taskId != taskId) {
         if (!taskId) {
           throw new Error("Task must be selected");
         }
@@ -106,6 +107,96 @@ export async function updateSubmissionStatus(c: Context) {
       "Submissions.Controllers.updateSubmissionStatus.error: ",
       error,
     );
+    return c.json({ error: "Internal server error" }, 500);
+  }
+}
+
+export async function updateCustomSubmission(c: Context) {
+  const user = c.get("user");
+  if (!user || typeof user.id !== "string") {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+
+  const submissionId = c.req.param("id");
+  if (!submissionId) {
+    return c.json({ error: "Submission ID is required" }, 400);
+  }
+
+  const body = await c.req.json();
+  const newTaskId = body.taskId;
+  const basePoints = body.basePoints;
+  const validatedBody = updateCustomSubmissionSchema.safeParse({
+    newTaskId,
+    basePoints,
+  });
+  if (validatedBody.error) {
+    return c.json({ error: validatedBody.error.issues }, 400);
+  }
+
+  try {
+    const submission = await db.query.submissions.findFirst({
+      where: (submissions, { eq }) =>
+        eq(submissions.id, submissionId) && eq(submissions.userId, user.id),
+    });
+
+    if (!submission) {
+      return c.json({ error: "Submission not found" }, 404);
+    }
+
+    if (submission.taskId !== null) {
+      return c.json(
+        { error: "This submission is already associated with a task." },
+        400,
+      );
+    }
+
+    const [updatedSubmission] = await db
+      .update(submissions)
+      .set({
+        taskId: newTaskId,
+        basePoints,
+      })
+      .where(eq(submissions.id, submissionId))
+      .returning();
+
+    return c.json({ submission: updatedSubmission });
+  } catch (error) {
+    console.error(
+      "Submissions.Controllers.updateCustomSubmissionTaskId.error: ",
+      error,
+    );
+    return c.json({ error: "Internal server error" }, 500);
+  }
+}
+
+export async function deleteSubmission(c: Context) {
+  const submissionId = c.req.param("id");
+
+  if (!submissionId) {
+    return c.json({ error: "Submission ID is required" }, 400);
+  }
+
+  try {
+    const existingSub = await db.query.submissions.findFirst({
+      where: eq(submissions.id, submissionId),
+    });
+
+    if (!existingSub) {
+      return c.json({ error: "Submission not found" }, 404);
+    }
+
+    const [deletedSub] = await db
+      .delete(submissions)
+      .where(eq(submissions.id, submissionId))
+      .returning();
+
+    return c.json({ submission: deletedSub });
+  } catch (error) {
+    console.error(
+      "Admin.Controllers.deleteSubmissionController.error: ",
+      error,
+    );
+
     return c.json({ error: "Internal server error" }, 500);
   }
 }

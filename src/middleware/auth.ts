@@ -49,6 +49,16 @@ export const requireAdmin = createMiddleware<Env>(async (c, next) => {
   return next();
 });
 
+export const requireServiceAuth = createMiddleware(async (c, next) => {
+  const token = c.req.header("x-api-key");
+
+  if (!token || token !== Bun.env.AI_SERVICE_API_KEY) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+
+  await next();
+});
+
 export const requireBotSecret = createMiddleware(async (c, next) => {
   const secret = c.req.header("x-bot-secret");
   if (!secret || secret !== Bun.env.TELEGRAM_BOT_SHARED_SECRET) {

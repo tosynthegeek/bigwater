@@ -19,6 +19,7 @@ const envSchema = z.object({
   AWS_ACCESS_KEY: z.string(),
   AWS_ACCESS_SECRET: z.string(),
   AWS_CLOUDFRONT_URL: z.string(),
+  AI_SERVICE_API_KEY: z.string(),
 });
 
 export default function parseEnv() {

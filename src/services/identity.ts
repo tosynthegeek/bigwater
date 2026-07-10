@@ -38,7 +38,6 @@ export async function getOrCreateUserByPrivyDid(
       .values({
         userId: user.id,
         isMember: opts.isMember ?? false,
-        sustainabilityScore: opts.isMember ? MEMBER_HEAD_START : 0,
       })
       .returning();
 
@@ -63,9 +62,16 @@ export async function resolveUserByTelegramId(telegramUserId: string) {
     where: eq(participantProfile.telegramId, telegramUserId),
   });
 
-  if (!profile) return null;
+  if (!profile) {
+    console.log("No profile found for user");
+    return null;
+  }
 
-  return db.query.users.findFirst({ where: eq(users.id, profile.userId) });
+  const user = db.query.users.findFirst({
+    where: eq(users.id, profile.userId),
+  });
+
+  return user;
 }
 
 export async function generateTelegramLinkCode(userId: string) {
@@ -118,26 +124,6 @@ export async function redeemTelegramLinkCode(
 
     return { ok: true, userId: linkCode.userId } as const;
   });
-}
-
-export async function seedAdminsFromEnv() {
-  const raw = Bun.env.ADMIN_PRIVY_DIDS;
-  if (!raw) return;
-
-  const dids = raw
-    .split(",")
-    .map((d) => d.trim())
-    .filter(Boolean);
-
-  for (const did of dids) {
-    const user = await getOrCreateUserByPrivyDid(did);
-    if (user.role !== "admin" && user.role !== "superadmin") {
-      await db
-        .update(users)
-        .set({ role: "admin" })
-        .where(eq(users.id, user.id));
-    }
-  }
 }
 
 function randomLinkCode(): string {

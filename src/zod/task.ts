@@ -8,3 +8,12 @@ export const createTaskSchema = z.object({
   isHighValue: z.boolean().optional(),
   active: z.boolean().optional(),
 });
+
+export const updateTaskSchema = z.object({
+  title: z.string().min(1).optional(),
+  description: z.string().nullable().optional(),
+  category: z.string().min(1).optional(),
+  basePoints: z.number().int().min(0).optional(),
+  isHighValue: z.boolean().optional(),
+  active: z.boolean().optional(),
+});

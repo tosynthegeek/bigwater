@@ -1,10 +1,7 @@
 import { type Context } from "hono";
-import {
-  createSubmission,
-} from "@/services/submissions/submissions";
+import { createSubmission } from "@/services/submissions/submissions";
 import { getParticipantProfileByUserId } from "@/services/identity";
 import { db } from "@/db";
-import { updateCustomSubmissionSchema } from "@/zod/submission";
 import { submissions, tasks } from "@/db/schema/bigwater";
 import { eq } from "drizzle-orm";
 
@@ -38,6 +35,8 @@ export async function submitProof(c: Context) {
       file,
       "web",
     );
+
+    // call the ai model
 
     return c.json({ submission }, 201);
   } catch (error) {
@@ -96,70 +95,7 @@ export async function getSubmissionById(c: Context) {
   }
 }
 
-export async function updateCustomSubmission(c: Context) {
-  const user = c.get("user");
-  if (!user || typeof user.id !== "string") {
-    return c.json({ error: "Unauthorized" }, 401);
-  }
-
-  const submissionId = c.req.param("id");
-  if (!submissionId) {
-    return c.json({ error: "Submission ID is required" }, 400);
-  }
-
-  const body = await c.req.json();
-  const newTaskId = body.taskId;
-  const basePoints = body.basePoints;
-  const validatedBody = updateCustomSubmissionSchema.safeParse({
-    newTaskId,
-    basePoints,
-  });
-  if (validatedBody.error) {
-    return c.json({ error: validatedBody.error.issues }, 400);
-  }
-
-  try {
-    const submission = await db.query.submissions.findFirst({
-      where: (submissions, { eq }) =>
-        eq(submissions.id, submissionId) && eq(submissions.userId, user.id),
-    });
-
-    if (!submission) {
-      return c.json({ error: "Submission not found" }, 404);
-    }
-
-    if (submission.taskId !== null) {
-      return c.json(
-        { error: "This submission is already associated with a task." },
-        400,
-      );
-    }
-
-    const [updatedSubmission] = await db
-      .update(submissions)
-      .set({
-        taskId: newTaskId,
-        basePoints,
-      })
-      .where(eq(submissions.id, submissionId))
-      .returning();
-
-    return c.json({ submission: updatedSubmission });
-  } catch (error) {
-    console.error(
-      "Submissions.Controllers.updateCustomSubmissionTaskId.error: ",
-      error,
-    );
-    return c.json({ error: "Internal server error" }, 500);
-  }
-}
-
 export async function updateSubmissionAiConfidence(c: Context) {
-  const user = c.get("user");
-  if (!user || typeof user.id !== "string") {
-    return c.json({ error: "Unauthorized" }, 401);
-  }
-
   const submissionId = c.req.param("id");
   if (!submissionId) {
     return c.json({ error: "Submission ID is required" }, 400);
@@ -168,7 +104,6 @@ export async function updateSubmissionAiConfidence(c: Context) {
   const body = await c.req.json();
   const aiConfidence = body.aiConfidence;
 
-  // Validate aiConfidence
   if (
     typeof aiConfidence !== "number" ||
     aiConfidence < 0 ||
@@ -182,8 +117,7 @@ export async function updateSubmissionAiConfidence(c: Context) {
 
   try {
     const submission = await db.query.submissions.findFirst({
-      where: (submissions, { eq }) =>
-        eq(submissions.id, submissionId) && eq(submissions.userId, user.id),
+      where: (submissions, { eq }) => eq(submissions.id, submissionId),
     });
 
     if (!submission) {

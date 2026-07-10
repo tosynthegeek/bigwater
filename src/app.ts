@@ -7,9 +7,16 @@ import { createMiddleware } from "hono/factory";
 import { sql } from "drizzle-orm";
 import { db } from "@/db";
 
-import { privyAuth, requireAuth, requireAdmin } from "@/middleware/auth";
+import {
+  privyAuth,
+  requireAuth,
+  requireAdmin,
+  requireServiceAuth,
+} from "@/middleware/auth";
 
-import ApiRouter from "@/api/routes/bigwater-routes";
+import ApiRouter from "@/api/routes/public-routes";
+import AdminRouter from "./api/routes/admin-router";
+import InternalRouter from "./api/routes/internal-routes";
 
 const app = new Hono();
 
@@ -55,9 +62,10 @@ app.use(
   }),
 );
 
-app.use("*", privyAuth);
+app.use("/api/*", privyAuth);
+app.use("/api/*", requireAuth);
 
-app.get("/health", async (c) => {
+app.get("/api/health", async (c) => {
   try {
     await db.execute(sql`SELECT 1`);
     return c.text("OK");
@@ -68,6 +76,10 @@ app.get("/health", async (c) => {
 
 app.use("/api/*", requireAuth);
 app.use("/api/admin/*", requireAdmin);
+app.use("/internal/*", requireServiceAuth);
+
+app.route("/api/admin", AdminRouter);
 app.route("/api", ApiRouter);
+app.route("/internal", InternalRouter);
 
 export default app;

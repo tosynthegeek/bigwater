@@ -33,15 +33,18 @@ export async function getTaskById(taskId: string) {
   });
 }
 
-export async function createTask(params: CreateTaskParams) {
-  const [task] = await db.insert(tasks).values({
-    title: params.title,
-    description: params.description ?? null,
-    category: params.category,
-    basePoints: params.basePoints,
-    isHighValue: params.isHighValue ?? false,
-    active: params.active ?? true,
-  }).returning();
+export async function createtask(params: CreateTaskParams) {
+  const [task] = await db
+    .insert(tasks)
+    .values({
+      title: params.title,
+      description: params.description ?? null,
+      category: params.category,
+      basePoints: params.basePoints,
+      isHighValue: params.isHighValue ?? false,
+      active: params.active ?? true,
+    })
+    .returning();
 
   return task;
 }
