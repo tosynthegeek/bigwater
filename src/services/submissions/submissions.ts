@@ -9,6 +9,7 @@ import {
 import { eq, sql } from "drizzle-orm";
 import { uploadFileToS3 } from "@/services/s3";
 import { format } from "date-fns";
+import { SubmissionRejectedError } from "@/utils/errors";
 import { enforceSubmissionLimits } from "./submission-limits";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -27,7 +28,7 @@ export async function createSubmission(
       });
 
   if (!isCustom && !task) {
-    throw new Error("Selected task does not exist.");
+    throw new SubmissionRejectedError("Selected task does not exist.");
   }
 
   let taskInfo: { id: string; isHighValue: boolean } | null = null;

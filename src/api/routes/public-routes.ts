@@ -2,6 +2,7 @@ import { Hono } from "hono";
 import {
   createTelegramLinkCode,
   getParticipantProfile,
+  getParticipantSubmissions,
   login,
 } from "@/api/controllers/participants-controllers";
 import { listActiveTasks } from "@/api/controllers/tasks-controllers";
@@ -22,6 +23,7 @@ ApiRouter.post("/telegram/link-code", createTelegramLinkCode);
 ApiRouter.get("/tasks", listActiveTasks);
 ApiRouter.post("/submissions/send", submitProof);
 ApiRouter.get("/participants/profile", getParticipantProfile);
+ApiRouter.get("/participants/submissions", getParticipantSubmissions);
 ApiRouter.get("/submissions/:id", getSubmissionById);
 
 ApiRouter.get("/leaderboard", globalLeaderboard);
