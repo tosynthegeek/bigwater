@@ -4,6 +4,7 @@ import { getParticipantProfileByUserId } from "@/services/identity";
 import { db } from "@/db";
 import { submissions, tasks } from "@/db/schema/bigwater";
 import { eq } from "drizzle-orm";
+import { SubmissionRejectedError } from "@/utils/errors";
 
 export async function submitProof(c: Context) {
   const user = c.get("user");
@@ -40,6 +41,9 @@ export async function submitProof(c: Context) {
 
     return c.json({ submission }, 201);
   } catch (error) {
+    if (error instanceof SubmissionRejectedError) {
+      return c.json({ error: error.message }, error.status);
+    }
     console.error("Submissions.Controllers.submitProof.error: ", error);
     return c.json({ error: "Internal server error" }, 500);
   }

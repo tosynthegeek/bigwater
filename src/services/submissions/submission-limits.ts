@@ -1,4 +1,5 @@
 import { startOfDayUtc } from "@/utils/time";
+import { SubmissionRejectedError } from "@/utils/errors";
 import { getSubmissionLimits } from "../economy/limits";
 import { and, count, desc, eq, gte } from "drizzle-orm";
 import { db } from "@/db";
@@ -23,8 +24,9 @@ export async function enforceSubmissionLimits(
     const cooldownMs = limits.cooldownHours * 60 * 60 * 1000;
     if (elapsedMs < cooldownMs) {
       const minutesLeft = Math.ceil((cooldownMs - elapsedMs) / 1000 / 60);
-      throw new Error(
+      throw new SubmissionRejectedError(
         `You must wait ${minutesLeft} more minutes before submitting again.`,
+        429,
       );
     }
   }
@@ -46,8 +48,9 @@ export async function enforceSubmissionLimits(
       : limits.maxSubmissionsPerDay;
 
   if (totalSubmissionsCount >= maxSubmissionsPerDay) {
-    throw new Error(
+    throw new SubmissionRejectedError(
       `You have reached the daily limit of ${maxSubmissionsPerDay} submissions.`,
+      429,
     );
   }
 
@@ -69,7 +72,10 @@ export async function enforceSubmissionLimits(
     const totalHighValue = result[0]?.totalHighValue ?? 0;
 
     if (totalHighValue >= limits.maxHighValuePerDay) {
-      throw new Error("You can only submit one high-value task per day.");
+      throw new SubmissionRejectedError(
+        "You can only submit one high-value task per day.",
+        429,
+      );
     }
   }
 }
