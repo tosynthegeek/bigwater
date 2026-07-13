@@ -82,3 +82,74 @@ export async function enforceSubmissionLimits(
     }
   }
 }
+
+export async function getSubmissionLimitStatus(userId: string) {
+  const now = new Date();
+  const today = startOfDayUtc(now);
+
+  const limits = await db.query.submissionLimits.findFirst();
+
+  if (!limits) {
+    throw new Error("Submission limits not configured");
+  }
+
+  const latestSubmission = await db.query.submissions.findFirst({
+    where: eq(submissions.userId, userId),
+    orderBy: desc(submissions.createdAt),
+  });
+
+  const cooldownMs = limits.cooldownHours * 60 * 60 * 1000;
+
+  let remainingSeconds = 0;
+  let nextSubmissionAt: Date | null = null;
+
+  if (latestSubmission) {
+    const expires = latestSubmission.createdAt.getTime() + cooldownMs;
+
+    if (expires > now.getTime()) {
+      remainingSeconds = Math.ceil((expires - now.getTime()) / 1000);
+      nextSubmissionAt = new Date(expires);
+    }
+  }
+
+  const totalSubmissionsRes = await db
+    .select({
+      totalSubmissions: count(),
+    })
+    .from(submissions)
+    .where(
+      and(eq(submissions.userId, userId), gte(submissions.createdAt, today)),
+    );
+
+  const totalSubmissionsCount = totalSubmissionsRes[0]?.totalSubmissions ?? 0;
+
+  const totalHighValueRes = await db
+    .select({
+      totalHighValue: count(),
+    })
+    .from(submissions)
+    .innerJoin(tasks, eq(submissions.taskId, tasks.id))
+    .where(
+      and(
+        eq(submissions.userId, userId),
+        gte(submissions.createdAt, today),
+        eq(tasks.isHighValue, true),
+      ),
+    );
+
+  const totalHighValueCount = totalHighValueRes[0]?.totalHighValue ?? 0;
+
+  return {
+    cooldown: {
+      active: remainingSeconds > 0,
+      remainingSeconds,
+      nextSubmissionAt,
+    },
+    today: {
+      submissionsUsed: totalSubmissionsCount,
+      submissionsLimit: limits.maxSubmissionsPerDay,
+      highValueUsed: totalHighValueCount,
+      highValueLimit: limits.maxHighValuePerDay,
+    },
+  };
+}

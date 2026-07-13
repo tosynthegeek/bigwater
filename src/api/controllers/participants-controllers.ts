@@ -1,8 +1,13 @@
 import { type Context } from "hono";
 import { generateTelegramLinkCode } from "@/services/identity";
-import { participantProfile, type users } from "@/db/schema/bigwater";
+import {
+  participantProfile,
+  submissions,
+  tasks,
+  type users,
+} from "@/db/schema/bigwater";
 import { db } from "@/db";
-import { eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 
 type User = typeof users.$inferSelect;
 
@@ -83,12 +88,23 @@ export async function getParticipantSubmissions(c: Context) {
   }
 
   try {
-    const submissions = await db.query.submissions.findMany({
-      where: (submissions, { eq }) => eq(submissions.userId, user.id),
-      orderBy: (submissions, { desc }) => desc(submissions.createdAt),
-    });
+    const rows = await db
+      .select({
+        submission: submissions,
+        taskTitle: tasks.title,
+      })
+      .from(submissions)
+      .leftJoin(tasks, eq(submissions.taskId, tasks.id))
+      .where(eq(submissions.userId, user.id))
+      .orderBy(desc(submissions.createdAt));
 
-    return c.json({ submissions }, 200); /// TODO: add task name, custom if null and derive name if not custom
+    const result = rows.map(({ submission, taskTitle }) => ({
+      ...submission,
+      taskId: submission.taskId ?? "custom",
+      taskTitle: taskTitle ?? "Custom",
+    }));
+
+    return c.json({ submissions: result }, 200);
   } catch (error) {
     console.error(
       "Identity.Controllers.participants-controllers.getParticipantSubmissions.error: ",

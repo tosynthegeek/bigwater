@@ -5,6 +5,7 @@ import { db } from "@/db";
 import { submissions, tasks } from "@/db/schema/bigwater";
 import { eq } from "drizzle-orm";
 import { SubmissionRejectedError } from "@/utils/errors";
+import { getSubmissionLimitStatus } from "@/services/submissions/submission-limits";
 
 export async function submitProof(c: Context) {
   const user = c.get("user");
@@ -143,6 +144,27 @@ export async function updateSubmissionAiConfidence(c: Context) {
       "Submissions.Controllers.updateSubmissionAiConfidence.error: ",
       error,
     );
+    return c.json({ error: "Internal server error" }, 500);
+  }
+}
+
+export async function getSubmissionLimitsStatus(c: Context) {
+  const user = c.get("user");
+
+  if (!user || typeof user.id !== "string") {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+
+  try {
+    const status = await getSubmissionLimitStatus(user.id);
+
+    return c.json(status, 200);
+  } catch (error) {
+    console.error(
+      "Submissions.Controllers.getSubmissionLimitsStatus.error:",
+      error,
+    );
+
     return c.json({ error: "Internal server error" }, 500);
   }
 }

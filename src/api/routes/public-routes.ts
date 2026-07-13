@@ -8,6 +8,7 @@ import {
 import { listActiveTasks } from "@/api/controllers/tasks-controllers";
 import {
   getSubmissionById,
+  getSubmissionLimitsStatus,
   submitProof,
 } from "@/api/controllers/submissions-controllers";
 import {
@@ -25,7 +26,7 @@ ApiRouter.post("/submissions/send", submitProof);
 ApiRouter.get("/participants/profile", getParticipantProfile);
 ApiRouter.get("/participants/submissions", getParticipantSubmissions);
 ApiRouter.get("/submissions/:id", getSubmissionById);
-
+ApiRouter.get("/submissions/limits", getSubmissionLimitsStatus);
 ApiRouter.get("/leaderboard", globalLeaderboard);
 ApiRouter.get("/leaderboard/monthly", monthlyLeaderboard);
 
