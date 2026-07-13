@@ -9,6 +9,7 @@ import {
   updateCustomSubmission,
   reviewSubmission,
   deleteSubmission,
+  getReadyForReviewSubmissions,
 } from "../controllers/admin-submissions-controller";
 import {
   getBands,
@@ -28,6 +29,7 @@ AdminRouter.get("/bands", getBands);
 AdminRouter.patch("/bands/:id", updateBand);
 AdminRouter.get("/submissions/custom", getCustomSubmissions);
 AdminRouter.delete("/submissions/:id", deleteSubmission);
+AdminRouter.get("/submissions/review", getReadyForReviewSubmissions);
 AdminRouter.patch("/submissions/:id/review", reviewSubmission);
 AdminRouter.patch("/submissions/:id/custom", updateCustomSubmission);
 
