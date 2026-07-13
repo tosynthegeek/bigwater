@@ -1,6 +1,5 @@
 import { startOfDayUtc } from "@/utils/time";
 import { SubmissionRejectedError } from "@/utils/errors";
-import { getSubmissionLimits } from "../economy/limits";
 import { and, count, desc, eq, gte } from "drizzle-orm";
 import { db } from "@/db";
 import { submissions, tasks } from "@/db/schema/bigwater";
@@ -12,7 +11,11 @@ export async function enforceSubmissionLimits(
   const now = new Date();
   const today = startOfDayUtc(now);
 
-  const limits = await getSubmissionLimits();
+  const limits = await db.query.submissionLimits.findFirst();
+
+  if (!limits) {
+    throw new Error("Submission limits not configured");
+  }
 
   const latestSubmission = await db.query.submissions.findFirst({
     where: eq(submissions.userId, userId),

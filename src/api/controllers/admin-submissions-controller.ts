@@ -3,7 +3,7 @@ import type { Context } from "hono";
 
 import { db } from "@/db";
 import { submissions, tasks } from "@/db/schema/bigwater";
-import { eq } from "drizzle-orm";
+import { desc, eq } from "drizzle-orm";
 import { updateUserStreak } from "@/services/economy/streaks";
 import { updateCustomSubmissionSchema } from "@/zod/submission";
 
@@ -190,10 +190,34 @@ export async function deleteSubmission(c: Context) {
       .where(eq(submissions.id, submissionId))
       .returning();
 
-    return c.json({ submission: deletedSub });
+    return c.json({ submission: deletedSub }, 200);
   } catch (error) {
     console.error(
       "Admin.Controllers.deleteSubmissionController.error: ",
+      error,
+    );
+
+    return c.json({ error: "Internal server error" }, 500);
+  }
+}
+
+export async function getReadyForReviewSubmissions(c: Context) {
+  const user = c.get("user");
+  if (!user || typeof user.id !== "string") {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+
+  try {
+    const submissionsReadyForReview = await db
+      .select()
+      .from(submissions)
+      .where(eq(submissions.status, "under_review"))
+      .orderBy(desc(submissions.createdAt));
+
+    return c.json({ submissionsReadyForReview }, 200);
+  } catch (error) {
+    console.error(
+      "Admin.Controllers.getReadyForReviewSubmissions.error: ",
       error,
     );
 
