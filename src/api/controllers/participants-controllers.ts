@@ -88,7 +88,7 @@ export async function getParticipantSubmissions(c: Context) {
       orderBy: (submissions, { desc }) => desc(submissions.createdAt),
     });
 
-    return c.json({ submissions }, 200);
+    return c.json({ submissions }, 200); /// TODO: add task name, custom if null and derive name if not custom
   } catch (error) {
     console.error(
       "Identity.Controllers.participants-controllers.getParticipantSubmissions.error: ",

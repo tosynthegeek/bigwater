@@ -9,10 +9,7 @@ import {
 const TELEGRAM_LINK_CODE_TTL_MS = 10 * 60 * 1000;
 const MEMBER_HEAD_START = 100_000;
 
-export async function getOrCreateUserByPrivyDid(
-  privyDid: string,
-  opts: { isMember?: boolean } = {},
-) {
+export async function getOrCreateUserByPrivyDid(privyDid: string) {
   const existing = await db.query.users.findFirst({
     where: eq(users.privyDid, privyDid),
   });
@@ -37,7 +34,6 @@ export async function getOrCreateUserByPrivyDid(
       .insert(participantProfile)
       .values({
         userId: user.id,
-        isMember: opts.isMember ?? false,
       })
       .returning();
 
