@@ -14,9 +14,10 @@ import {
   requireServiceAuth,
 } from "@/middleware/auth";
 
-import ApiRouter from "@/api/routes/public-routes";
-import AdminRouter from "./api/routes/admin-router";
+import ApiRouter from "@/api/routes/api-routes";
+import AdminRouter from "./api/routes/admin-routes";
 import InternalRouter from "./api/routes/internal-routes";
+import { PublicRouter } from "./api/routes/public-routes";
 
 const app = new Hono();
 
@@ -63,6 +64,7 @@ app.use(
 );
 
 app.use("/api/*", privyAuth);
+app.route("/api", PublicRouter);
 app.use("/api/*", requireAuth);
 
 app.get("/api/health", async (c) => {
@@ -74,7 +76,6 @@ app.get("/api/health", async (c) => {
   }
 });
 
-app.use("/api/*", requireAuth);
 app.use("/api/admin/*", requireAdmin);
 app.use("/internal/*", requireServiceAuth);
 

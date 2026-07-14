@@ -17,6 +17,7 @@ export const privyAuth = createMiddleware<Env>(async (c, next) => {
 
   if (!token) {
     c.set("user", null);
+    console.log("no token found");
     return next();
   }
 

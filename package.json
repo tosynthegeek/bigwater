@@ -24,6 +24,7 @@
     "drizzle-orm": "^0.45.2",
     "grammy": "^1.44.0",
     "hono": "^4.12.27",
+    "hono-rate-limiter": "^0.5.3",
     "ioredis": "^5.11.1",
     "nanoid": "^5.1.16",
     "pg": "^8.22.0",

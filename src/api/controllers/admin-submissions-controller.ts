@@ -2,7 +2,7 @@ import { processApprovedSubmission } from "@/services/economy/score";
 import type { Context } from "hono";
 
 import { db } from "@/db";
-import { submissions, tasks } from "@/db/schema/bigwater";
+import { participantProfile, submissions, tasks } from "@/db/schema/bigwater";
 import { desc, eq } from "drizzle-orm";
 import { updateUserStreak } from "@/services/economy/streaks";
 import { updateCustomSubmissionSchema } from "@/zod/submission";
@@ -208,11 +208,39 @@ export async function getReadyForReviewSubmissions(c: Context) {
   }
 
   try {
-    const submissionsReadyForReview = await db
-      .select()
+    const result = await db
+      .select({
+        id: submissions.id,
+        userId: submissions.userId,
+        taskId: submissions.taskId,
+        source: submissions.source,
+        status: submissions.status,
+        imageUrl: submissions.imageUrl,
+        basePoints: submissions.basePoints,
+        aiConfidence: submissions.aiConfidence,
+        aiVerdict: submissions.aiVerdict,
+        createdAt: submissions.createdAt,
+        updatedAt: submissions.updatedAt,
+
+        taskTitle: tasks.title,
+
+        username: participantProfile.username,
+        walletAddress: participantProfile.walletAddress,
+      })
       .from(submissions)
+      .leftJoin(tasks, eq(submissions.taskId, tasks.id))
+      .leftJoin(
+        participantProfile,
+        eq(submissions.userId, participantProfile.userId),
+      )
       .where(eq(submissions.status, "under_review"))
       .orderBy(desc(submissions.createdAt));
+
+    const submissionsReadyForReview = result.map((submission) => ({
+      ...submission,
+      taskId: submission.taskId ?? "custom",
+      taskTitle: submission.taskId ? submission.taskTitle : "Custom",
+    }));
 
     return c.json({ submissionsReadyForReview }, 200);
   } catch (error) {
