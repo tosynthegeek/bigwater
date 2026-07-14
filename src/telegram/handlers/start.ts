@@ -5,7 +5,8 @@ import { redeemTelegramLinkCode } from "@/services/identity";
 export function registerStartHandler(bot: Bot<BotContext>) {
   bot.command("start", async (ctx) => {
     const telegramUserId = ctx.from?.id.toString();
-    if (!telegramUserId) return;
+    const username = ctx.from?.username?.toString();
+    if (!telegramUserId || !username) return;
 
     // grammY exposes the deep-link payload via ctx.match for a plain
     // bot.command("start", ...) handler.
@@ -19,7 +20,7 @@ export function registerStartHandler(bot: Bot<BotContext>) {
       return;
     }
 
-    const result = await redeemTelegramLinkCode(code, telegramUserId);
+    const result = await redeemTelegramLinkCode(code, telegramUserId, username);
 
     if (!result.ok) {
       const message =
@@ -35,5 +36,3 @@ export function registerStartHandler(bot: Bot<BotContext>) {
     );
   });
 }
-
-

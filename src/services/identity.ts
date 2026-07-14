@@ -7,7 +7,6 @@ import {
 } from "@/db/schema/bigwater";
 
 const TELEGRAM_LINK_CODE_TTL_MS = 10 * 60 * 1000;
-const MEMBER_HEAD_START = 100_000;
 
 export async function getOrCreateUserByPrivyDid(privyDid: string) {
   const existing = await db.query.users.findFirst({
@@ -86,6 +85,7 @@ type RedeemResult =
 export async function redeemTelegramLinkCode(
   code: string,
   telegramUserId: string,
+  username: string,
 ): Promise<RedeemResult> {
   return db.transaction(async (tx) => {
     const linkCode = await tx.query.telegramLinkCodes.findFirst({
@@ -110,7 +110,7 @@ export async function redeemTelegramLinkCode(
 
     await tx
       .update(participantProfile)
-      .set({ telegramId: telegramUserId })
+      .set({ telegramId: telegramUserId, username: username })
       .where(eq(participantProfile.userId, linkCode.userId));
 
     await tx
