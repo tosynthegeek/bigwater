@@ -96,7 +96,8 @@ export async function reviewSubmission(c: Context) {
           status,
           updatedAt: new Date(),
         })
-        .where(eq(submissions.id, submission.id));
+        .where(eq(submissions.id, submission.id))
+        .returning();
 
       return updatedSubmission;
     });
@@ -135,8 +136,7 @@ export async function updateCustomSubmission(c: Context) {
 
   try {
     const submission = await db.query.submissions.findFirst({
-      where: (submissions, { eq }) =>
-        eq(submissions.id, submissionId) && eq(submissions.userId, user.id),
+      where: eq(submissions.id, submissionId),
     });
 
     if (!submission) {
