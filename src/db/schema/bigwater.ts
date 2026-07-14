@@ -7,6 +7,7 @@ import {
   boolean,
   timestamp,
   numeric,
+  unique,
 } from "drizzle-orm/pg-core";
 import { nanoid } from "@/utils/nanoid";
 
@@ -152,25 +153,34 @@ export const sustainabilityScore = pgTable("sustainability_score", {
     .defaultNow(),
 });
 
-export const monthlyTally = pgTable("monthly_tally", {
-  id: varchar("id").primaryKey().$defaultFn(nanoid),
-  userId: varchar("user_id")
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  month: varchar("month").notNull(),
-  baseTally: integer("base_tally").notNull().default(0),
-  band: text("band").notNull().default("seedling"),
-  multiplier: integer("multiplier").notNull().default(50),
-  streakBonus: integer("streak_bonus").notNull().default(0),
-  bankedAmount: integer("banked_amount").notNull().default(0),
-  isFinalized: boolean("is_finalized").notNull().default(false),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-  updatedAt: timestamp("updated_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-});
+export const monthlyTally = pgTable(
+  "monthly_tally",
+  {
+    id: varchar("id").primaryKey().$defaultFn(nanoid),
+    userId: varchar("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    month: varchar("month").notNull(),
+    baseTally: integer("base_tally").notNull().default(0),
+    band: text("band").notNull().default("seedling"),
+    multiplier: integer("multiplier").notNull().default(50),
+    streakBonus: integer("streak_bonus").notNull().default(0),
+    bankedAmount: integer("banked_amount").notNull().default(0),
+    isFinalized: boolean("is_finalized").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    // processApprovedSubmission's insert().onConflictDoUpdate() upserts
+    // one row per user per month — needs this to exist as a real DB
+    // constraint, not just an assumption in the query.
+    unique("monthly_tally_user_id_month_unique").on(table.userId, table.month),
+  ],
+);
 
 export const userStreaks = pgTable("user_streaks", {
   userId: varchar("user_id")
