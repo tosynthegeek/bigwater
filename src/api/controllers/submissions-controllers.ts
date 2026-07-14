@@ -6,6 +6,7 @@ import { submissions, tasks } from "@/db/schema/bigwater";
 import { eq } from "drizzle-orm";
 import { SubmissionRejectedError } from "@/utils/errors";
 import { getSubmissionLimitStatus } from "@/services/submissions/submission-limits";
+import { updateSubmissionAiConfidenceSchema } from "@/zod/submission";
 
 export async function submitProof(c: Context) {
   const user = c.get("user");
@@ -107,18 +108,13 @@ export async function updateSubmissionAiConfidence(c: Context) {
   }
 
   const body = await c.req.json();
-  const aiConfidence = body.aiConfidence;
+  const validatedBody = updateSubmissionAiConfidenceSchema.safeParse(body);
 
-  if (
-    typeof aiConfidence !== "number" ||
-    aiConfidence < 0 ||
-    aiConfidence > 100
-  ) {
-    return c.json(
-      { error: "aiConfidence must be a number between 0 and 100." },
-      400,
-    );
+  if (!validatedBody.success) {
+    return c.json({ error: validatedBody.error.issues }, 400);
   }
+
+  const { aiConfidence, aiVerdict } = validatedBody.data;
 
   try {
     const submission = await db.query.submissions.findFirst({
@@ -133,6 +129,7 @@ export async function updateSubmissionAiConfidence(c: Context) {
       .update(submissions)
       .set({
         aiConfidence,
+        aiVerdict,
         status: "under_review",
       })
       .where(eq(submissions.id, submissionId))
