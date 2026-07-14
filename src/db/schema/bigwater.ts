@@ -43,8 +43,10 @@ export const participantProfile = pgTable("participant_profile", {
     .notNull()
     .unique()
     .references(() => users.id, { onDelete: "cascade" }),
+  username: text("username"),
   telegramId: text("telegram_id").unique(),
   isMember: boolean("is_member").notNull().default(false),
+  walletAddress: varchar("wallet_address", { length: 42 }),
   currentBand: text("current_band").notNull().default("seedling"),
   status: text("status").notNull().default("active"),
   createdAt: timestamp("created_at", { withTimezone: true })
