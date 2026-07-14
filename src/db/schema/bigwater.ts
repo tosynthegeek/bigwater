@@ -84,6 +84,7 @@ export const submissions = pgTable("submissions", {
   imageUrl: text("image_url"),
   basePoints: integer("base_points").notNull().default(0),
   aiConfidence: integer("ai_confidence"),
+  aiVerdict: text("ai_verdict"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
