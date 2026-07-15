@@ -16,18 +16,15 @@ type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
 export async function createSubmission(
   userId: string,
-  taskIdOrCustom: string,
+  taskId: string,
   image: File,
   source: "telegram" | "web",
 ) {
-  const isCustom = taskIdOrCustom === "custom";
-  const task = isCustom
-    ? null
-    : await db.query.tasks.findFirst({
-        where: eq(tasks.id, taskIdOrCustom),
-      });
+  const task = await db.query.tasks.findFirst({
+    where: eq(tasks.id, taskId),
+  });
 
-  if (!isCustom && !task) {
+  if (!task) {
     throw new SubmissionRejectedError("Selected task does not exist.");
   }
 
@@ -44,11 +41,11 @@ export async function createSubmission(
     .insert(submissions)
     .values({
       userId,
-      taskId: task?.id ?? null,
+      taskId: task.id,
       source,
       status: "pending",
       imageUrl: fileId,
-      basePoints: task?.basePoints ?? 0,
+      basePoints: task.basePoints,
     })
     .returning();
 
