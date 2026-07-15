@@ -20,6 +20,15 @@ const envSchema = z.object({
   AWS_ACCESS_SECRET: z.string(),
   AWS_CLOUDFRONT_URL: z.string(),
   AI_SERVICE_API_KEY: z.string(),
+  // Optional / operational
+  REDIS_PASSWORD: z.string().optional(),
+  // Comma-separated Privy DIDs granted the admin role on seed (src/db/seed/admins.ts).
+  // Without at least one, the admin panel has no admin to log in as.
+  ADMIN_PRIVY_DIDS: z.string().optional(),
+  // Demo-only: route new submissions straight to "under_review" (see
+  // services/submissions/submissions.ts) so the review->approve loop is
+  // demoable without the external AI verification service. Leave unset in prod.
+  DEMO_AUTO_REVIEW: z.string().optional(),
 });
 
 export default function parseEnv() {

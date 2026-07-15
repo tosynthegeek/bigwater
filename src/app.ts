@@ -63,11 +63,11 @@ app.use(
   }),
 );
 
-app.use("/api/*", privyAuth);
-app.route("/api", PublicRouter);
-app.use("/api/*", requireAuth);
-
-app.get("/api/health", async (c) => {
+// Unauthenticated health check (used by Railway/uptime probes). Must be
+// registered before the "/api/*" auth middleware so it is reachable without a
+// bearer token — the previous "/api/health" sat after requireAuth and always
+// returned 401.
+app.get("/health", async (c) => {
   try {
     await db.execute(sql`SELECT 1`);
     return c.text("OK");
@@ -75,6 +75,10 @@ app.get("/api/health", async (c) => {
     return c.text("Database unavailable", 500);
   }
 });
+
+app.use("/api/*", privyAuth);
+app.route("/api", PublicRouter);
+app.use("/api/*", requireAuth);
 
 app.use("/api/admin/*", requireAdmin);
 app.use("/internal/*", requireServiceAuth);

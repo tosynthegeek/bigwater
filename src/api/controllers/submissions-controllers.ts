@@ -59,8 +59,8 @@ export async function getCustomSubmissions(c: Context) {
 
   try {
     const submissions = await db.query.submissions.findMany({
-      where: (submissions, { eq, isNull }) =>
-        eq(submissions.userId, user.id) && isNull(submissions.taskId),
+      where: (submissions, { and, eq, isNull }) =>
+        and(eq(submissions.userId, user.id), isNull(submissions.taskId)),
       orderBy: (submissions, { desc }) => desc(submissions.createdAt),
     });
     return c.json({ submissions });
@@ -86,8 +86,8 @@ export async function getSubmissionById(c: Context) {
 
   try {
     const submission = await db.query.submissions.findFirst({
-      where: (submissions, { eq }) =>
-        eq(submissions.id, submissionId) && eq(submissions.userId, user.id),
+      where: (submissions, { and, eq }) =>
+        and(eq(submissions.id, submissionId), eq(submissions.userId, user.id)),
     });
 
     if (!submission) {

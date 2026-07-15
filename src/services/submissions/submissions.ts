@@ -40,15 +40,26 @@ export async function createSubmission(
 
   const fileId = await uploadFileToS3(image);
 
+  // Demo mode: the external AI verification microservice is not deployed, so
+  // nothing would ever move a submission from "pending" to "under_review" and
+  // it could never reach the admin review queue. When DEMO_AUTO_REVIEW=true we
+  // stamp a synthetic verdict and route straight to "under_review" so the
+  // submit -> review -> approve loop is demoable end-to-end. In production
+  // (flag unset/false) behaviour is unchanged: submissions land as "pending"
+  // and wait for the real AI service to review them.
+  const demoAutoReview = Bun.env.DEMO_AUTO_REVIEW === "true";
+
   const [submission] = await db
     .insert(submissions)
     .values({
       userId,
       taskId: task?.id ?? null,
       source,
-      status: "pending",
+      status: demoAutoReview ? "under_review" : "pending",
       imageUrl: fileId,
       basePoints: task?.basePoints ?? 0,
+      aiConfidence: demoAutoReview ? 95 : null,
+      aiVerdict: demoAutoReview ? "auto-review (demo mode)" : null,
     })
     .returning();
 
