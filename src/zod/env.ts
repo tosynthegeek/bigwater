@@ -21,6 +21,9 @@ const envSchema = z.object({
   AWS_CLOUDFRONT_URL: z.string(),
   AI_SERVICE_API_KEY: z.string(),
   // Optional / operational
+  // Custom S3 endpoint for an S3-compatible store (MinIO/R2/Supabase/B2).
+  // Unset = real AWS S3. See src/s3-client.ts.
+  AWS_S3_ENDPOINT: z.string().optional(),
   REDIS_PASSWORD: z.string().optional(),
   // Comma-separated Privy DIDs granted the admin role on seed (src/db/seed/admins.ts).
   // Without at least one, the admin panel has no admin to log in as.
