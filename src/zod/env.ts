@@ -24,6 +24,13 @@ const envSchema = z.object({
   // Custom S3 endpoint for an S3-compatible store (MinIO/R2/Supabase/B2).
   // Unset = real AWS S3. See src/s3-client.ts.
   AWS_S3_ENDPOINT: z.string().optional(),
+  // Storage driver: "s3" (default) or "local" (write to UPLOAD_DIR, serve via
+  // GET /uploads). For local, PUBLIC_BASE_URL must be the API's public origin.
+  STORAGE_DRIVER: z.enum(["s3", "local"]).optional(),
+  UPLOAD_DIR: z.string().optional(),
+  PUBLIC_BASE_URL: z.string().optional(),
+  // Run the Telegram bot in the API process (single-service deploys). See index.ts.
+  RUN_BOT_IN_PROCESS: z.string().optional(),
   REDIS_PASSWORD: z.string().optional(),
   // Comma-separated Privy DIDs granted the admin role on seed (src/db/seed/admins.ts).
   // Without at least one, the admin panel has no admin to log in as.
