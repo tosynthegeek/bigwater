@@ -21,6 +21,7 @@ console.log(`🚀 API running on http://localhost:${port}`);
 // background (bot.start() is not awaited there), so this does not block serving.
 // Production can instead run the bot as its own process via `bun run start:bot`.
 if (Bun.env.RUN_BOT_IN_PROCESS === "true") {
-  await import("@/telegram/index");
+  const { startTelegramBot } = await import("@/telegram/run");
+  startTelegramBot();
   console.log("🤖 Telegram bot started in-process (long polling)");
 }

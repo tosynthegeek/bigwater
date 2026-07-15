@@ -1,18 +1,6 @@
-import { bot } from "@/telegram/bot";
-import { registerStartHandler } from "@/telegram/handlers/start";
-import { registerTaskHandlers } from "@/telegram/handlers/tasks";
-import { registerPhotoHandler } from "@/telegram/handlers/photo";
-import { registerCallbackHandlers } from "@/telegram/handlers/callbacks";
+// Standalone entrypoint for the Telegram bot (`bun run start:bot`).
+// The actual startup + auto-recovery logic lives in ./run so it is shared with
+// the in-process mode (RUN_BOT_IN_PROCESS) booted from the root index.ts.
+import { startTelegramBot } from "@/telegram/run";
 
-registerStartHandler(bot);
-registerTaskHandlers(bot);
-registerPhotoHandler(bot);
-registerCallbackHandlers(bot);
-
-bot.catch((err) => {
-  console.error("Telegram.Bot.error: ", err);
-});
-
-bot.start();
-
-console.log("Telegram bot is running (long polling)");
+startTelegramBot();
