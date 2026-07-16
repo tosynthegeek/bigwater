@@ -20,7 +20,6 @@ export async function reviewSubmission(c: Context) {
 
   const body = await c.req.json();
   const status = body.status;
-  const taskId = body.taskId;
 
   const validStatuses = ["approved", "rejected"];
   if (!validStatuses.includes(status)) {
@@ -54,38 +53,12 @@ export async function reviewSubmission(c: Context) {
         );
       }
 
-      let awardedPoints = submission.basePoints;
-
-      if (!submission.taskId || submission.taskId != taskId) {
-        if (!taskId) {
-          throw new Error("Task must be selected");
-        }
-
-        const task = await tx.query.tasks.findFirst({
-          where: eq(tasks.id, taskId),
-        });
-
-        if (!task) {
-          throw new Error("Task not found");
-        }
-
-        awardedPoints = task.basePoints;
-
-        await tx
-          .update(submissions)
-          .set({
-            taskId: task.id,
-            basePoints: task.basePoints,
-          })
-          .where(eq(submissions.id, submission.id));
-      }
-
       if (status === "approved") {
         await processApprovedSubmission(
           tx,
           submission.userId,
           submission.id,
-          awardedPoints,
+          submission.basePoints,
         );
         await updateUserStreak(tx, submission.userId);
       }
@@ -112,6 +85,7 @@ export async function reviewSubmission(c: Context) {
   }
 }
 
+/// will be removed
 export async function updateCustomSubmission(c: Context) {
   const user = c.get("user");
   if (!user || typeof user.id !== "string") {

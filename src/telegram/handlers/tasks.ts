@@ -18,7 +18,6 @@ export function registerTaskHandlers(bot: Bot<BotContext>) {
     for (const task of tasks) {
       keyboard.text(task.title, `task:${task.id}`).row();
     }
-    keyboard.text("Custom submission", "task:custom");
 
     await ctx.reply("What did you do?", { reply_markup: keyboard });
   });

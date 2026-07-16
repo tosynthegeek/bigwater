@@ -15,10 +15,10 @@ export async function submitProof(c: Context) {
   }
 
   const body = await c.req.formData();
-  const taskIdOrCustom = body.get("taskIdOrCustom");
+  const taskId = body.get("taskId");
   const file = body.get("file");
 
-  if (!taskIdOrCustom || typeof taskIdOrCustom !== "string") {
+  if (!taskId || typeof taskId !== "string") {
     return c.json({ error: "Invalid task selection" }, 400);
   }
 
@@ -32,12 +32,7 @@ export async function submitProof(c: Context) {
       return c.json({ error: "Profile not found" }, 404);
     }
 
-    const submission = await createSubmission(
-      user.id,
-      taskIdOrCustom,
-      file,
-      "web",
-    );
+    const submission = await createSubmission(user.id, taskId, file, "web");
 
     // call the ai model
 
@@ -51,6 +46,7 @@ export async function submitProof(c: Context) {
   }
 }
 
+/// will be removed
 export async function getCustomSubmissions(c: Context) {
   const user = c.get("user");
   if (!user || typeof user.id !== "string") {

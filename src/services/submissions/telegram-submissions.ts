@@ -4,8 +4,8 @@ import { getTelegramPhotoFile } from "@/telegram/handlers/photo";
 export async function createTelegramSubmission(
   fileId: string,
   userId: string,
-  taskIdOrCustom: string,
+  taskId: string,
 ) {
   const file = await getTelegramPhotoFile(fileId);
-  return createSubmission(userId, taskIdOrCustom, file, "telegram");
+  return createSubmission(userId, taskId, file, "telegram");
 }
