@@ -5,8 +5,16 @@ import { redeemTelegramLinkCode } from "@/services/identity";
 export function registerStartHandler(bot: Bot<BotContext>) {
   bot.command("start", async (ctx) => {
     const telegramUserId = ctx.from?.id.toString();
-    const username = ctx.from?.username?.toString();
-    if (!telegramUserId || !username) return;
+    if (!telegramUserId) return;
+
+    // Not every Telegram account has a @username set. Requiring one used to make
+    // /start silently do nothing for those users (a confusing dead end). Fall
+    // back to the first name, then a stable tg_<id> handle, so linking always
+    // proceeds — participant_profile.username is nullable/display-only anyway.
+    const username =
+      ctx.from?.username?.toString() ??
+      ctx.from?.first_name?.toString() ??
+      `tg_${telegramUserId}`;
 
     // grammY exposes the deep-link payload via ctx.match for a plain
     // bot.command("start", ...) handler.

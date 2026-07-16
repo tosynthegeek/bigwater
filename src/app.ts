@@ -37,17 +37,21 @@ app.use(
   }),
 );
 
+// CLIENT_URL may be a comma-separated list of allowed origins — the user app
+// and the admin app deploy as two separate frontends, so both origins must be
+// allowed to call the API with credentials.
+const allowedOrigins = (Bun.env.CLIENT_URL ?? "")
+  .split(",")
+  .map((o) => o.trim())
+  .filter(Boolean);
+
 app.use(
   "*",
   cors({
     origin:
       Bun.env.NODE_ENV === "production"
-        ? [Bun.env.CLIENT_URL]
-        : [
-            Bun.env.CLIENT_URL,
-            "http://localhost:3000",
-            "http://localhost:3001",
-          ],
+        ? allowedOrigins
+        : [...allowedOrigins, "http://localhost:3000", "http://localhost:3001"],
     credentials: true,
     allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     exposeHeaders: ["Content-Length"],
@@ -63,11 +67,11 @@ app.use(
   }),
 );
 
-app.use("/api/*", privyAuth);
-app.route("/api", PublicRouter);
-app.use("/api/*", requireAuth);
-
-app.get("/api/health", async (c) => {
+// Unauthenticated health check (used by Railway/uptime probes). Must be
+// registered before the "/api/*" auth middleware so it is reachable without a
+// bearer token — the previous "/api/health" sat after requireAuth and always
+// returned 401.
+app.get("/health", async (c) => {
   try {
     await db.execute(sql`SELECT 1`);
     return c.text("OK");
@@ -75,6 +79,24 @@ app.get("/api/health", async (c) => {
     return c.text("Database unavailable", 500);
   }
 });
+
+// Public serving for the "local" storage driver (STORAGE_DRIVER=local): proof
+// images are written to UPLOAD_DIR and served here so the admin queue can
+// display them. Unauthenticated by design (an <img src> can't send a bearer
+// token), and outside "/api" so it never hits requireAuth. No-op in the default
+// "s3" driver (returns 404). The filename regex blocks path traversal.
+app.get("/uploads/:filename", async (c) => {
+  const filename = c.req.param("filename");
+  if (!/^[A-Za-z0-9._-]+$/.test(filename)) return c.notFound();
+  const uploadDir = Bun.env.UPLOAD_DIR ?? "./uploads";
+  const file = Bun.file(`${uploadDir}/${filename}`);
+  if (!(await file.exists())) return c.notFound();
+  return new Response(file);
+});
+
+app.use("/api/*", privyAuth);
+app.route("/api", PublicRouter);
+app.use("/api/*", requireAuth);
 
 app.use("/api/admin/*", requireAdmin);
 app.use("/internal/*", requireServiceAuth);

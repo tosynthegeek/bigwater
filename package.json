@@ -35,6 +35,8 @@
   },
   "scripts": {
     "start": "bun index.ts",
+    "start:api": "bunx drizzle-kit migrate && bun index.ts",
+    "start:bot": "bun run src/telegram/index.ts",
     "lint": "bunx eslint . --ext .ts,.tsx",
     "format": "bunx prettier --check .",
     "format:fix": "bunx prettier --write .",
