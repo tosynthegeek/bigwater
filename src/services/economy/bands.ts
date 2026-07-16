@@ -9,15 +9,19 @@ export async function getBands() {
 }
 
 export async function getBandForMonthlyTally(points: number) {
-  const allBands = await getBands();
+  const bands = await getBands();
 
-  const band = allBands.find(
+  if (bands.length === 0) {
+    throw new Error("No bands configured");
+  }
+
+  const match = bands.find(
     (band) => points >= band.minPoints && points <= band.maxPoints,
   );
 
-  if (!band) {
-    throw new Error("No matching band");
+  if (match) {
+    return match;
   }
 
-  return band;
+  return bands[bands.length - 1]!;
 }

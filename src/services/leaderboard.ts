@@ -4,6 +4,7 @@ import {
   sustainabilityScore,
   monthlyTally,
   users,
+  userStreaks,
 } from "@/db/schema/bigwater";
 
 import { desc, eq, sql } from "drizzle-orm";
@@ -13,14 +14,14 @@ export async function getGlobalLeaderboard(limit = 100) {
     .select({
       userId: users.id,
       displayName: users.displayName,
-
       sustainabilityScore: sustainabilityScore.totalScore,
-
       currentBand: participantProfile.currentBand,
+      currentStreak: userStreaks.currentStreak,
     })
     .from(sustainabilityScore)
     .innerJoin(users, eq(users.id, sustainabilityScore.userId))
     .innerJoin(participantProfile, eq(participantProfile.userId, users.id))
+    .leftJoin(userStreaks, eq(userStreaks.userId, users.id))
     .orderBy(desc(sustainabilityScore.totalScore))
     .limit(limit);
 }

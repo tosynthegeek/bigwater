@@ -1,11 +1,11 @@
 import { db } from "@/db";
-import { asc } from "drizzle-orm";
+import { and, asc } from "drizzle-orm";
 import { userStreaks, streakBonuses } from "@/db/schema/bigwater";
 import { eq, sql } from "drizzle-orm";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
-function startOfUtcDay(date: Date) {
+export function startOfUtcDay(date: Date) {
   const d = new Date(date);
   d.setUTCHours(0, 0, 0, 0);
   return d;
@@ -101,4 +101,21 @@ export async function getBonusForStreak(days: number) {
   }
 
   return current;
+}
+
+export async function runDailyStreakReset() {
+  const now = new Date();
+  const yesterdayStart = new Date(
+    startOfUtcDay(now).getTime() - 24 * 60 * 60 * 1000,
+  );
+
+  await db
+    .update(userStreaks)
+    .set({ currentStreak: 0, updatedAt: now })
+    .where(
+      and(
+        sql`${userStreaks.lastActivityDate} < ${yesterdayStart}`,
+        sql`${userStreaks.currentStreak} > 0`,
+      ),
+    );
 }
