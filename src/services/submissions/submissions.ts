@@ -54,7 +54,6 @@ export async function createSubmission(
       source,
       status: demoAutoReview ? "under_review" : "pending",
       imageUrl: fileId,
-      basePoints: task?.basePoints ?? 0,
       aiConfidence: demoAutoReview ? 95 : null,
       aiVerdict: demoAutoReview ? "auto-review (demo mode)" : null,
     })

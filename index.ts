@@ -1,13 +1,15 @@
 import app from "@/app";
 import { runSeeds } from "@/db/seed";
+import { startQueues, stopQueues } from "@/services/queues";
 import parseEnv from "@/zod/env";
 
 parseEnv();
 await runSeeds();
+await startQueues();
 
 const port = Number(Bun.env.PORT ?? 3000);
 
-Bun.serve({
+const server = Bun.serve({
   port,
   idleTimeout: 240,
   fetch: app.fetch,
@@ -25,3 +27,25 @@ if (Bun.env.RUN_BOT_IN_PROCESS === "true") {
   startTelegramBot();
   console.log("🤖 Telegram bot started in-process (long polling)");
 }
+
+let shuttingDown = false;
+
+async function shutdown(signal: string) {
+  if (shuttingDown) return; // ignore a second SIGTERM/SIGINT while draining
+  shuttingDown = true;
+  console.log(`\n${signal} received, draining...`);
+
+  server.stop();
+
+  try {
+    await stopQueues();
+    console.log("Queues drained cleanly");
+  } catch (err) {
+    console.error("Error draining queues:", err);
+  }
+
+  process.exit(0);
+}
+
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));

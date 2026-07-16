@@ -54,11 +54,19 @@ export async function reviewSubmission(c: Context) {
       }
 
       if (status === "approved") {
+        const task = await tx.query.tasks.findFirst({
+          where: eq(tasks.id, submission.taskId),
+        });
+
+        if (!task) {
+          return c.json({ error: "Invalid task ID for submission" }, 400);
+        }
+
         await processApprovedSubmission(
           tx,
           submission.userId,
           submission.id,
-          submission.basePoints,
+          task.basePoints,
         );
         await updateUserStreak(tx, submission.userId);
       }
@@ -79,64 +87,6 @@ export async function reviewSubmission(c: Context) {
   } catch (error) {
     console.error(
       "Submissions.Controllers.updateSubmissionStatus.error: ",
-      error,
-    );
-    return c.json({ error: "Internal server error" }, 500);
-  }
-}
-
-/// will be removed
-export async function updateCustomSubmission(c: Context) {
-  const user = c.get("user");
-  if (!user || typeof user.id !== "string") {
-    return c.json({ error: "Unauthorized" }, 401);
-  }
-
-  const submissionId = c.req.param("id");
-  if (!submissionId) {
-    return c.json({ error: "Submission ID is required" }, 400);
-  }
-
-  const body = await c.req.json();
-  const newTaskId = body.taskId;
-  const basePoints = body.basePoints;
-  const validatedBody = updateCustomSubmissionSchema.safeParse({
-    newTaskId,
-    basePoints,
-  });
-  if (validatedBody.error) {
-    return c.json({ error: validatedBody.error.issues }, 400);
-  }
-
-  try {
-    const submission = await db.query.submissions.findFirst({
-      where: eq(submissions.id, submissionId),
-    });
-
-    if (!submission) {
-      return c.json({ error: "Submission not found" }, 404);
-    }
-
-    if (submission.taskId !== null) {
-      return c.json(
-        { error: "This submission is already associated with a task." },
-        400,
-      );
-    }
-
-    const [updatedSubmission] = await db
-      .update(submissions)
-      .set({
-        taskId: newTaskId,
-        basePoints,
-      })
-      .where(eq(submissions.id, submissionId))
-      .returning();
-
-    return c.json({ submission: updatedSubmission });
-  } catch (error) {
-    console.error(
-      "Submissions.Controllers.updateCustomSubmissionTaskId.error: ",
       error,
     );
     return c.json({ error: "Internal server error" }, 500);
@@ -190,7 +140,7 @@ export async function getReadyForReviewSubmissions(c: Context) {
         source: submissions.source,
         status: submissions.status,
         imageUrl: submissions.imageUrl,
-        basePoints: submissions.basePoints,
+        basePoints: tasks.basePoints,
         aiConfidence: submissions.aiConfidence,
         aiVerdict: submissions.aiVerdict,
         createdAt: submissions.createdAt,

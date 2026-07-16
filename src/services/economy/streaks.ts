@@ -2,6 +2,7 @@ import { db } from "@/db";
 import { and, asc } from "drizzle-orm";
 import { userStreaks, streakBonuses } from "@/db/schema/bigwater";
 import { eq, sql } from "drizzle-orm";
+import { periodIndex, timeframes } from "./config";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -20,45 +21,41 @@ function diffInDays(a: Date, b: Date) {
 
 export async function updateUserStreak(tx: Tx, userId: string) {
   const now = new Date();
+  const nowIdx = periodIndex(now, timeframes.dayPeriodMs);
 
   const streak = await tx.query.userStreaks.findFirst({
     where: eq(userStreaks.userId, userId),
   });
 
-  if (!streak) {
-    await tx.insert(userStreaks).values({
-      userId,
-      currentStreak: 1,
-      longestStreak: 1,
-      lastActivityDate: now,
-    });
-
-    return;
-  }
-
-  if (!streak.lastActivityDate) {
+  if (!streak || !streak.lastActivityDate) {
     await tx
-      .update(userStreaks)
-      .set({
+      .insert(userStreaks)
+      .values({
+        userId,
         currentStreak: 1,
-        longestStreak: sql`GREATEST(${userStreaks.longestStreak},1)`,
+        longestStreak: 1,
         lastActivityDate: now,
-        updatedAt: now,
       })
-      .where(eq(userStreaks.userId, userId));
-
+      .onConflictDoUpdate({
+        target: userStreaks.userId,
+        set: {
+          currentStreak: 1,
+          longestStreak: sql`GREATEST(${userStreaks.longestStreak}, 1)`,
+          lastActivityDate: now,
+          updatedAt: now,
+        },
+      });
     return;
   }
 
-  const days = diffInDays(now, streak.lastActivityDate);
+  const lastIdx = periodIndex(streak.lastActivityDate, timeframes.dayPeriodMs);
+  const diff = nowIdx - lastIdx;
 
-  // already counted today
-  if (days === 0) {
+  if (diff === 0) {
     return;
   }
 
-  // consecutive day
-  if (days === 1) {
+  if (diff === 1) {
     await tx
       .update(userStreaks)
       .set({
@@ -103,18 +100,17 @@ export async function getBonusForStreak(days: number) {
   return current;
 }
 
-export async function runDailyStreakReset() {
+export async function runStreakBreakSweep() {
   const now = new Date();
-  const yesterdayStart = new Date(
-    startOfUtcDay(now).getTime() - 24 * 60 * 60 * 1000,
-  );
+  const cutoffIdx = periodIndex(now, timeframes.dayPeriodMs) - 1;
+  const cutoff = new Date(cutoffIdx * timeframes.dayPeriodMs);
 
   await db
     .update(userStreaks)
     .set({ currentStreak: 0, updatedAt: now })
     .where(
       and(
-        sql`${userStreaks.lastActivityDate} < ${yesterdayStart}`,
+        sql`${userStreaks.lastActivityDate} < ${cutoff}`,
         sql`${userStreaks.currentStreak} > 0`,
       ),
     );

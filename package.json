@@ -33,6 +33,9 @@
     "ws": "^8.21.0",
     "zod": "^4.4.3"
   },
+  "overrides": {
+    "ioredis": "^5.11.1"
+  },
   "scripts": {
     "start": "bun index.ts",
     "start:api": "bunx drizzle-kit migrate && bun index.ts",

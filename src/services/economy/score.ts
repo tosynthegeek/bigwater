@@ -1,4 +1,3 @@
-import { format } from "date-fns";
 import { and, eq, sql } from "drizzle-orm";
 
 import { db } from "@/db";
@@ -13,6 +12,7 @@ import {
 
 import { getBandForMonthlyTally } from "./bands";
 import { getBonusForStreak } from "./streaks";
+import { getTallyPeriod } from "./tally";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -20,15 +20,15 @@ export async function processApprovedSubmission(
   tx: Tx,
   userId: string,
   submissionId: string,
-  basePoints: number,
+  pointsAwarded: number,
 ) {
   const now = new Date();
-  const month = format(now, "yyyy-MM");
+  const { key: month, end: periodEnd } = getTallyPeriod(now);
 
   await tx.insert(pointsLedger).values({
     userId,
     submissionId,
-    basePoints,
+    basePoints: pointsAwarded,
     month,
   });
 
@@ -37,12 +37,13 @@ export async function processApprovedSubmission(
     .values({
       userId,
       month,
-      baseTally: basePoints,
+      baseTally: pointsAwarded,
+      periodEnd,
     })
     .onConflictDoUpdate({
       target: [monthlyTally.userId, monthlyTally.month],
       set: {
-        baseTally: sql`${monthlyTally.baseTally} + ${basePoints}`,
+        baseTally: sql`${monthlyTally.baseTally} + ${pointsAwarded}`,
         updatedAt: now,
       },
     });
@@ -56,14 +57,6 @@ export async function processApprovedSubmission(
   }
 
   const band = await getBandForMonthlyTally(tally.baseTally);
-
-  await tx
-    .update(participantProfile)
-    .set({
-      currentBand: band.name,
-      updatedAt: now,
-    })
-    .where(eq(participantProfile.userId, userId));
 
   await tx
     .update(monthlyTally)
@@ -80,10 +73,19 @@ export async function bankMonthlyScoreForUser(
   userId: string,
   month: string,
 ) {
-  const tally = await tx.query.monthlyTally.findFirst({
-    where: (t, { and, eq }) => and(eq(t.userId, userId), eq(t.month, month)),
-  });
-  if (!tally || tally.isFinalized) return;
+  const [claimed] = await tx
+    .update(monthlyTally)
+    .set({ isFinalized: true, updatedAt: new Date() })
+    .where(
+      and(
+        eq(monthlyTally.userId, userId),
+        eq(monthlyTally.month, month),
+        eq(monthlyTally.isFinalized, false),
+      ),
+    )
+    .returning();
+
+  if (!claimed) return;
 
   const streak = await tx.query.userStreaks.findFirst({
     where: eq(userStreaks.userId, userId),
@@ -92,42 +94,42 @@ export async function bankMonthlyScoreForUser(
     ? await getBonusForStreak(streak.currentStreak)
     : 0;
 
+  const BASIS = 100;
   const bankedAmount = Math.floor(
-    (tally.baseTally * tally.multiplier * (100 + streakBonusPercent)) / 10000,
+    (claimed.baseTally * claimed.multiplier * (BASIS + streakBonusPercent)) /
+      (BASIS * BASIS),
   );
 
   const score = await tx.query.sustainabilityScore.findFirst({
     where: eq(sustainabilityScore.userId, userId),
   });
-  const newTotal = (score?.totalScore ?? 0) + bankedAmount;
+  const startingScore = score?.totalScore ?? 0;
+  const newTotal = startingScore + bankedAmount;
 
   await tx
     .insert(sustainabilityScore)
-    .values({ userId, totalScore: newTotal, lastBankedMonth: month })
+    .values({ userId, totalScore: newTotal })
     .onConflictDoUpdate({
       target: sustainabilityScore.userId,
-      set: {
-        totalScore: newTotal,
-        lastBankedMonth: month,
-        updatedAt: new Date(),
-      },
+      set: { totalScore: newTotal, updatedAt: new Date() },
     });
 
   await tx.insert(scoreHistory).values({
     userId,
     month,
-    tally: tally.baseTally,
-    band: tally.band,
-    multiplier: tally.multiplier,
+    tally: claimed.baseTally,
+    band: claimed.band,
+    multiplier: claimed.multiplier,
     streakBonusPercent,
+    startingScore,
     bankedAmount,
     resultingScore: newTotal,
   });
 
   await tx
     .update(monthlyTally)
-    .set({ bankedAmount, isFinalized: true, updatedAt: new Date() })
-    .where(and(eq(monthlyTally.userId, userId), eq(monthlyTally.month, month)));
+    .set({ bankedAmount })
+    .where(eq(monthlyTally.id, claimed.id));
 }
 
 export async function runMonthEndBanking(month: string) {
