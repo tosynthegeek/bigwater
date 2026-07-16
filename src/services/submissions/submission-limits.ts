@@ -6,7 +6,7 @@ import { submissions, tasks } from "@/db/schema/bigwater";
 
 export async function enforceSubmissionLimits(
   userId: string,
-  task: { id: string; isHighValue: boolean } | null,
+  task: { id: string; isHighValue: boolean },
 ) {
   const now = new Date();
   const today = startOfDayUtc(now);

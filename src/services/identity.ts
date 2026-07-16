@@ -114,6 +114,11 @@ export async function redeemTelegramLinkCode(
       .where(eq(participantProfile.userId, linkCode.userId));
 
     await tx
+      .update(users)
+      .set({ displayName: username })
+      .where(eq(users.id, linkCode.userId));
+
+    await tx
       .update(telegramLinkCodes)
       .set({ consumedAt: new Date() })
       .where(eq(telegramLinkCodes.code, code));

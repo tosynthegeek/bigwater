@@ -6,7 +6,6 @@ import {
   updateTask,
 } from "@/api/controllers/admin-tasks-controllers";
 import {
-  updateCustomSubmission,
   reviewSubmission,
   deleteSubmission,
   getReadyForReviewSubmissions,
@@ -17,6 +16,12 @@ import {
   updateBand,
   updateSubmissionLimits,
 } from "../controllers/admin-config-controllers";
+import {
+  adjustParticipantPoints,
+  flagParticipant,
+  getAllParticipants,
+} from "../controllers/admin-participants-controllers";
+import { getPlatformOverview } from "../controllers/admin-controllers";
 
 const AdminRouter = new Hono();
 
@@ -34,6 +39,10 @@ AdminRouter.get("/submissions/custom", getCustomSubmissions);
 AdminRouter.delete("/submissions/:id", deleteSubmission);
 AdminRouter.get("/submissions/review", getReadyForReviewSubmissions);
 AdminRouter.patch("/submissions/:id/review", reviewSubmission);
-AdminRouter.patch("/submissions/:id/custom", updateCustomSubmission);
+
+AdminRouter.get("/participants", getAllParticipants);
+AdminRouter.patch("/participants/:userId/flag", flagParticipant);
+AdminRouter.post("/participants/:userId/points", adjustParticipantPoints);
+AdminRouter.get("/overview", getPlatformOverview);
 
 export default AdminRouter;

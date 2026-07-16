@@ -1,15 +1,19 @@
 import { type Context } from "hono";
 import { generateTelegramLinkCode } from "@/services/identity";
 import {
+  monthlyTally,
   participantProfile,
   submissions,
+  sustainabilityScore,
   tasks,
-  type users,
+  users,
+  userStreaks,
 } from "@/db/schema/bigwater";
 import { db } from "@/db";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, sql } from "drizzle-orm";
+import { getTallyPeriod } from "@/services/economy/tally";
 
-type User = typeof users.$inferSelect;
+export type User = typeof users.$inferSelect;
 
 export async function login(c: Context) {
   const user = c.get("user") as User;
@@ -28,10 +32,7 @@ export async function login(c: Context) {
 
     return c.json({ user, isTelegramLinked }, 200);
   } catch (error) {
-    console.error(
-      "Identity.Controllers.participants-controllers.login.error: ",
-      error,
-    );
+    console.error("Controllers.participants-controllers.login.error: ", error);
     return c.json({ error: "Internal server error" }, 500);
   }
 }
@@ -46,7 +47,7 @@ export async function createTelegramLinkCode(c: Context) {
     return c.json({ code, expiresAt }, 200);
   } catch (error) {
     console.error(
-      "Identity.Controllers.participants-controllers.createTelegramLinkCode.error: ",
+      "Controllers.participants-controllers.createTelegramLinkCode.error: ",
       error,
     );
     return c.json({ error: "Internal server error" }, 500);
@@ -60,11 +61,50 @@ export async function getParticipantProfile(c: Context) {
     return c.json({ error: "User not found" }, 404);
   }
 
+  const now = new Date();
+  const currentMonthKey = getTallyPeriod(now).key;
+
   try {
     const [profile] = await db
-      .select()
+      .select({
+        userId: participantProfile.userId,
+        username: participantProfile.username,
+        isMember: participantProfile.isMember,
+        isFlagged: participantProfile.isFlagged,
+        walletAddress: participantProfile.walletAddress,
+        status: participantProfile.status,
+
+        totalScore: sustainabilityScore.totalScore,
+        headStart: sustainabilityScore.headStart,
+
+        monthlyTally: monthlyTally.baseTally,
+        currentBand: monthlyTally.band,
+        multiplier: monthlyTally.multiplier,
+
+        currentStreak: userStreaks.currentStreak,
+        longestStreak: userStreaks.longestStreak,
+
+        globalRank: sql<number>`
+        (SELECT RANK() OVER (ORDER BY total_score DESC) 
+         FROM sustainability_score 
+         WHERE user_id = ${user.id})
+      `.as("global_rank"),
+      })
       .from(participantProfile)
-      .where(eq(participantProfile.userId, user.id));
+      .where(eq(participantProfile.userId, user.id))
+      .innerJoin(
+        sustainabilityScore,
+        eq(sustainabilityScore.userId, participantProfile.userId),
+      )
+      .leftJoin(
+        monthlyTally,
+        and(
+          eq(monthlyTally.userId, participantProfile.userId),
+          eq(monthlyTally.month, currentMonthKey),
+          eq(monthlyTally.isFinalized, false),
+        ),
+      )
+      .leftJoin(userStreaks, eq(userStreaks.userId, user.id));
 
     if (!profile) {
       return c.json({ error: "Profile not found" }, 404);
@@ -73,7 +113,7 @@ export async function getParticipantProfile(c: Context) {
     return c.json({ profile }, 200);
   } catch (error) {
     console.error(
-      "Identity.Controllers.participants-controllers.getParticipantProfile.error: ",
+      "Controllers.participants-controllers.getParticipantProfile.error: ",
       error,
     );
     return c.json({ error: "Internal server error" }, 500);
@@ -107,7 +147,7 @@ export async function getParticipantSubmissions(c: Context) {
     return c.json({ submissions: result }, 200);
   } catch (error) {
     console.error(
-      "Identity.Controllers.participants-controllers.getParticipantSubmissions.error: ",
+      "Controllers.participants-controllers.getParticipantSubmissions.error: ",
       error,
     );
     return c.json({ error: "Internal server error" }, 500);

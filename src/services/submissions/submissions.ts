@@ -28,10 +28,7 @@ export async function createSubmission(
     throw new SubmissionRejectedError("Selected task does not exist.");
   }
 
-  let taskInfo: { id: string; isHighValue: boolean } | null = null;
-  if (task) {
-    taskInfo = { id: task.id, isHighValue: task.isHighValue };
-  }
+  const taskInfo = { id: task.id, isHighValue: task.isHighValue };
 
   await enforceSubmissionLimits(userId, taskInfo);
 

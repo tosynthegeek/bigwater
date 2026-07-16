@@ -5,7 +5,6 @@ import { db } from "@/db";
 import { participantProfile, submissions, tasks } from "@/db/schema/bigwater";
 import { desc, eq } from "drizzle-orm";
 import { updateUserStreak } from "@/services/economy/streaks";
-import { updateCustomSubmissionSchema } from "@/zod/submission";
 
 export async function reviewSubmission(c: Context) {
   const user = c.get("user");
