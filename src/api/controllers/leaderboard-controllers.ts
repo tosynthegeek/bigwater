@@ -1,79 +1,61 @@
 import { Context } from "hono";
 import {
-  getGlobalLeaderboard,
-  getWeeklyLeaderboard,
-  getMonthlyLeaderboard,
   getUserLeaderboardContext,
+  type LeaderboardTimeframe,
+  getLeaderboard,
 } from "@/services/leaderboard";
 
-export async function globalLeaderboard(c: Context) {
-  const user = c.get("user");
-  if (!user?.id) return c.json({ error: "Unauthorized" }, 401);
+const TIMEFRAMES: LeaderboardTimeframe[] = ["global", "weekly", "monthly"];
 
-  const limit = Math.min(parseInt(c.req.query("limit") || "50"), 50);
-  const offset = parseInt(c.req.query("offset") || "0");
-
-  try {
-    const [leaderboard, userContext] = await Promise.all([
-      getGlobalLeaderboard(limit, offset, user.id),
-      getUserLeaderboardContext(user.id),
-    ]);
-
-    return c.json({
-      leaderboard,
-      user: userContext,
-    });
-  } catch (error) {
-    console.error("Leaderboard.Controllers.globalLeaderboard.error:", error);
-    return c.json({ error: "Internal server error" }, 500);
-  }
+function parsePagination(c: Context) {
+  const rawLimit = parseInt(c.req.query("limit") ?? "", 10);
+  const rawOffset = parseInt(c.req.query("offset") ?? "", 10);
+  return {
+    limit: Math.min(
+      Math.max(Number.isFinite(rawLimit) ? rawLimit : 50, 1),
+      100,
+    ),
+    offset: Math.max(Number.isFinite(rawOffset) ? rawOffset : 0, 0),
+  };
 }
 
-export async function weeklyLeaderboard(c: Context) {
+export async function leaderboard(c: Context) {
   const user = c.get("user");
   if (!user?.id) return c.json({ error: "Unauthorized" }, 401);
 
-  const limit = Math.min(parseInt(c.req.query("limit") || "50"), 100);
-  const offset = parseInt(c.req.query("offset") || "0");
-
-  try {
-    const [leaderboard, userContext] = await Promise.all([
-      getWeeklyLeaderboard(limit, offset, user.id),
-      getUserLeaderboardContext(user.id, "weekly"),
-    ]);
-
-    return c.json({
-      leaderboard,
-      user: userContext,
-    });
-  } catch (error) {
-    console.error("Leaderboard.Controllers.weeklyLeaderboard.error:", error);
-    return c.json({ error: "Internal server error" }, 500);
+  const timeframe = (c.req.query("timeframe") ??
+    "global") as LeaderboardTimeframe;
+  if (!TIMEFRAMES.includes(timeframe)) {
+    return c.json(
+      { error: `timeframe must be one of: ${TIMEFRAMES.join(", ")}` },
+      400,
+    );
   }
-}
-
-export async function monthlyLeaderboard(c: Context) {
-  const user = c.get("user");
-  if (!user?.id) return c.json({ error: "Unauthorized" }, 401);
 
   const month = c.req.query("month");
-  if (!month) return c.json({ error: "month parameter is required" }, 400);
+  if (timeframe === "monthly" && !month) {
+    return c.json(
+      { error: "month parameter is required for timeframe=monthly" },
+      400,
+    );
+  }
 
-  const limit = Math.min(parseInt(c.req.query("limit") || "50"), 100);
-  const offset = parseInt(c.req.query("offset") || "0");
+  const { limit, offset } = parsePagination(c);
 
   try {
-    const [leaderboard, userContext] = await Promise.all([
-      getMonthlyLeaderboard(month, limit, offset, user.id),
-      getUserLeaderboardContext(user.id, "monthly", month),
+    const [board, userContext] = await Promise.all([
+      getLeaderboard(timeframe, {
+        limit,
+        offset,
+        month,
+        currentUserId: user.id,
+      }),
+      getUserLeaderboardContext(user.id, timeframe, month),
     ]);
 
-    return c.json({
-      leaderboard,
-      user: userContext,
-    });
+    return c.json({ leaderboard: board, user: userContext });
   } catch (error) {
-    console.error("Leaderboard.Controllers.monthlyLeaderboard.error:", error);
+    console.error("Leaderboard.Controllers.leaderboard.error:", error);
     return c.json({ error: "Internal server error" }, 500);
   }
 }

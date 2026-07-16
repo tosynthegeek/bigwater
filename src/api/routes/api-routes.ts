@@ -9,10 +9,7 @@ import {
   getSubmissionLimitsStatus,
   submitProof,
 } from "@/api/controllers/submissions-controllers";
-import {
-  globalLeaderboard,
-  monthlyLeaderboard,
-} from "../controllers/leaderboard-controllers";
+import { leaderboard } from "../controllers/leaderboard-controllers";
 
 const ApiRouter = new Hono();
 
@@ -24,7 +21,6 @@ ApiRouter.get("/participants/submissions", getParticipantSubmissions);
 // matches "/submissions/limits" as :id="limits" and this is never reached.
 ApiRouter.get("/submissions/limits", getSubmissionLimitsStatus);
 ApiRouter.get("/submissions/:id", getSubmissionById);
-ApiRouter.get("/leaderboard", globalLeaderboard);
-ApiRouter.get("/leaderboard/monthly", monthlyLeaderboard);
+ApiRouter.get("/leaderboard", leaderboard);
 
 export default ApiRouter;

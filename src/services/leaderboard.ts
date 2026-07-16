@@ -9,11 +9,45 @@ import {
 import { and, desc, eq, sql } from "drizzle-orm";
 import { getTallyPeriod, getWeekPeriod } from "./economy/tally";
 
+export type LeaderboardTimeframe = "global" | "weekly" | "monthly";
+
 function currentMonthJoin(now: Date) {
   return and(
     eq(monthlyTally.userId, users.id),
     eq(monthlyTally.month, getTallyPeriod(now).key),
   );
+}
+
+export async function getLeaderboard(
+  timeframe: LeaderboardTimeframe,
+  params: {
+    limit: number;
+    offset: number;
+    month?: string;
+    currentUserId: string;
+  },
+) {
+  switch (timeframe) {
+    case "global":
+      return getGlobalLeaderboard(
+        params.limit,
+        params.offset,
+        params.currentUserId,
+      );
+    case "weekly":
+      return getWeeklyLeaderboard(
+        params.limit,
+        params.offset,
+        params.currentUserId,
+      );
+    case "monthly":
+      return getMonthlyLeaderboard(
+        params.month!,
+        params.limit,
+        params.offset,
+        params.currentUserId,
+      );
+  }
 }
 
 export async function getGlobalLeaderboard(
