@@ -8,6 +8,7 @@ import {
   timestamp,
   numeric,
   unique,
+  index,
 } from "drizzle-orm/pg-core";
 import { nanoid } from "@/utils/nanoid";
 
@@ -48,7 +49,6 @@ export const participantProfile = pgTable("participant_profile", {
   isMember: boolean("is_member").notNull().default(false),
   isFlagged: boolean("is_flagged").notNull().default(false),
   walletAddress: varchar("wallet_address", { length: 42 }),
-  currentBand: text("current_band").notNull().default("seedling"),
   status: text("status").notNull().default("active"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
@@ -79,13 +79,14 @@ export const submissions = pgTable("submissions", {
   userId: varchar("user_id")
     .notNull()
     .references(() => users.id, { onDelete: "cascade" }),
-  taskId: varchar("task_id").references(() => tasks.id, {
-    onDelete: "set null",
-  }),
+  taskId: varchar("task_id")
+    .references(() => tasks.id, {
+      onDelete: "set null",
+    })
+    .notNull(),
   source: submissionSource("source").notNull(),
   status: submissionStatus("status").notNull().default("pending"),
   imageUrl: text("image_url"),
-  basePoints: integer("base_points").notNull().default(0),
   aiConfidence: integer("ai_confidence"),
   aiVerdict: text("ai_verdict"),
   createdAt: timestamp("created_at", { withTimezone: true })
@@ -122,20 +123,24 @@ export const submissionLimits = pgTable("submission_limits", {
     .defaultNow(),
 });
 
-export const pointsLedger = pgTable("points_ledger", {
-  id: varchar("id").primaryKey().$defaultFn(nanoid),
-  userId: varchar("user_id")
-    .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
-  submissionId: varchar("submission_id").references(() => submissions.id, {
-    onDelete: "set null",
-  }),
-  basePoints: integer("base_points").notNull(),
-  month: varchar("month").notNull(),
-  createdAt: timestamp("created_at", { withTimezone: true })
-    .notNull()
-    .defaultNow(),
-});
+export const pointsLedger = pgTable(
+  "points_ledger",
+  {
+    id: varchar("id").primaryKey().$defaultFn(nanoid),
+    userId: varchar("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    submissionId: varchar("submission_id").references(() => submissions.id, {
+      onDelete: "set null",
+    }),
+    basePoints: integer("base_points").notNull(),
+    month: varchar("month").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [index("points_ledger_created_at_idx").on(table.createdAt)],
+);
 
 export const sustainabilityScore = pgTable("sustainability_score", {
   userId: varchar("user_id")
@@ -143,13 +148,8 @@ export const sustainabilityScore = pgTable("sustainability_score", {
     .references(() => users.id, {
       onDelete: "cascade",
     }),
-
   totalScore: integer("total_score").notNull().default(0),
-
   headStart: integer("head_start").notNull().default(0),
-
-  lastBankedMonth: varchar("last_banked_month"),
-
   updatedAt: timestamp("updated_at", {
     withTimezone: true,
   })
@@ -170,6 +170,7 @@ export const monthlyTally = pgTable(
     multiplier: integer("multiplier").notNull().default(50),
     streakBonus: integer("streak_bonus").notNull().default(0),
     bankedAmount: integer("banked_amount").notNull().default(0),
+    periodEnd: timestamp("period_end", { withTimezone: true }).notNull(),
     isFinalized: boolean("is_finalized").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
@@ -220,6 +221,7 @@ export const scoreHistory = pgTable(
     band: text("band").notNull(),
     multiplier: integer("multiplier").notNull(),
     streakBonusPercent: integer("streak_bonus_percent").notNull().default(0),
+    startingScore: integer("starting_score").notNull(),
     bankedAmount: integer("banked_amount").notNull(),
     resultingScore: integer("resulting_score").notNull(),
     createdAt: timestamp("created_at", { withTimezone: true })

@@ -43,6 +43,20 @@
       "when": 1784010932844,
       "tag": "0005_early_greymalkin",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1784198843913,
+      "tag": "0006_long_chamber",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1784201983508,
+      "tag": "0007_smiling_omega_flight",
+      "breakpoints": true
     }
   ]
 }
