@@ -1,5 +1,5 @@
 import { db } from "@/db";
-import { and, asc } from "drizzle-orm";
+import { and, asc, gt, lt } from "drizzle-orm";
 import { userStreaks, streakBonuses } from "@/db/schema/bigwater";
 import { eq, sql } from "drizzle-orm";
 import { periodIndex, timeframes } from "./config";
@@ -107,11 +107,14 @@ export async function runStreakBreakSweep() {
 
   await db
     .update(userStreaks)
-    .set({ currentStreak: 0, updatedAt: now })
+    .set({
+      currentStreak: 0,
+      updatedAt: now,
+    })
     .where(
       and(
-        sql`${userStreaks.lastActivityDate} < ${cutoff}`,
-        sql`${userStreaks.currentStreak} > 0`,
+        lt(userStreaks.lastActivityDate, cutoff),
+        gt(userStreaks.currentStreak, 0),
       ),
     );
 }
