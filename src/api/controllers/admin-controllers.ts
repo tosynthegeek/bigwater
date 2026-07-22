@@ -20,13 +20,22 @@ export async function getPlatformOverview(c: Context) {
     const twoWeeksAgo = subDays(now, 14);
     const thirtyDaysAgo = subDays(now, 30);
 
+    // Raw `sql` template literals hand their interpolated values straight to
+    // the postgres driver's parameter binder, which (unlike Drizzle's own
+    // gte()/eq() helpers used below) doesn't run them through Drizzle's
+    // Date-aware type mapping — it expects a string/Buffer and throws
+    // ("Received an instance of Date") if handed a raw Date. Stringify once
+    // here rather than at each call site.
+    const oneWeekAgoIso = oneWeekAgo.toISOString();
+    const twoWeeksAgoIso = twoWeeksAgo.toISOString();
+
     const [memberStats, submissionStats, pendingReview, pointsStats] =
       await Promise.all([
         db
           .select({
             totalMembers: sql<number>`COUNT(*)`.mapWith(Number),
             newThisWeek: sql<number>`
-            COUNT(CASE WHEN ${users.createdAt} >= ${oneWeekAgo} THEN 1 END)
+            COUNT(CASE WHEN ${users.createdAt} >= ${oneWeekAgoIso} THEN 1 END)
           `.mapWith(Number),
           })
           .from(participantProfile)
@@ -35,11 +44,11 @@ export async function getPlatformOverview(c: Context) {
         db
           .select({
             proofsThisWeek: sql<number>`
-            COUNT(CASE WHEN ${submissions.createdAt} >= ${oneWeekAgo} THEN 1 END)
+            COUNT(CASE WHEN ${submissions.createdAt} >= ${oneWeekAgoIso} THEN 1 END)
           `.mapWith(Number),
             proofsLastWeek: sql<number>`
-            COUNT(CASE WHEN ${submissions.createdAt} >= ${twoWeeksAgo}
-                        AND ${submissions.createdAt} < ${oneWeekAgo} THEN 1 END)
+            COUNT(CASE WHEN ${submissions.createdAt} >= ${twoWeeksAgoIso}
+                        AND ${submissions.createdAt} < ${oneWeekAgoIso} THEN 1 END)
           `.mapWith(Number),
 
             approved30d:
@@ -52,34 +61,34 @@ export async function getPlatformOverview(c: Context) {
 
             approvedThisWeek: sql<number>`
             COUNT(CASE WHEN status = 'approved'
-                        AND ${submissions.createdAt} >= ${oneWeekAgo} THEN 1 END)
+                        AND ${submissions.createdAt} >= ${oneWeekAgoIso} THEN 1 END)
           `.mapWith(Number),
             reviewedThisWeek: sql<number>`
             COUNT(CASE WHEN status IN ('approved', 'rejected')
-                        AND ${submissions.createdAt} >= ${oneWeekAgo} THEN 1 END)
+                        AND ${submissions.createdAt} >= ${oneWeekAgoIso} THEN 1 END)
           `.mapWith(Number),
             approvedLastWeek: sql<number>`
             COUNT(CASE WHEN status = 'approved'
-                        AND ${submissions.createdAt} >= ${twoWeeksAgo}
-                        AND ${submissions.createdAt} < ${oneWeekAgo} THEN 1 END)
+                        AND ${submissions.createdAt} >= ${twoWeeksAgoIso}
+                        AND ${submissions.createdAt} < ${oneWeekAgoIso} THEN 1 END)
           `.mapWith(Number),
             reviewedLastWeek: sql<number>`
             COUNT(CASE WHEN status IN ('approved', 'rejected')
-                        AND ${submissions.createdAt} >= ${twoWeeksAgo}
-                        AND ${submissions.createdAt} < ${oneWeekAgo} THEN 1 END)
+                        AND ${submissions.createdAt} >= ${twoWeeksAgoIso}
+                        AND ${submissions.createdAt} < ${oneWeekAgoIso} THEN 1 END)
           `.mapWith(Number),
 
             snapshotApproved: sql<number>`
             COUNT(CASE WHEN status = 'approved'
-                        AND ${submissions.createdAt} >= ${oneWeekAgo} THEN 1 END)
+                        AND ${submissions.createdAt} >= ${oneWeekAgoIso} THEN 1 END)
           `.mapWith(Number),
             snapshotUnderReview: sql<number>`
             COUNT(CASE WHEN status = 'under_review'
-                        AND ${submissions.createdAt} >= ${oneWeekAgo} THEN 1 END)
+                        AND ${submissions.createdAt} >= ${oneWeekAgoIso} THEN 1 END)
           `.mapWith(Number),
             snapshotRejected: sql<number>`
             COUNT(CASE WHEN status = 'rejected'
-                        AND ${submissions.createdAt} >= ${oneWeekAgo} THEN 1 END)
+                        AND ${submissions.createdAt} >= ${oneWeekAgoIso} THEN 1 END)
           `.mapWith(Number),
           })
           .from(submissions)
@@ -97,12 +106,12 @@ export async function getPlatformOverview(c: Context) {
                 Number,
               ),
             pointsThisWeek: sql<number>`
-            COALESCE(SUM(CASE WHEN ${pointsLedger.createdAt} >= ${oneWeekAgo}
+            COALESCE(SUM(CASE WHEN ${pointsLedger.createdAt} >= ${oneWeekAgoIso}
                               THEN ${pointsLedger.basePoints} ELSE 0 END), 0)
           `.mapWith(Number),
             pointsLastWeek: sql<number>`
-            COALESCE(SUM(CASE WHEN ${pointsLedger.createdAt} >= ${twoWeeksAgo}
-                              AND ${pointsLedger.createdAt} < ${oneWeekAgo}
+            COALESCE(SUM(CASE WHEN ${pointsLedger.createdAt} >= ${twoWeeksAgoIso}
+                              AND ${pointsLedger.createdAt} < ${oneWeekAgoIso}
                               THEN ${pointsLedger.basePoints} ELSE 0 END), 0)
           `.mapWith(Number),
           })
