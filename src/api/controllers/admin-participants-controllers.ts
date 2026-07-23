@@ -8,7 +8,7 @@ import {
   userStreaks,
 } from "@/db/schema/bigwater";
 import { db } from "@/db";
-import { and, desc, eq, sql } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { format } from "date-fns";
 import { getBandForMonthlyTally } from "@/services/economy/bands";
 import { getTallyPeriod } from "@/services/economy/tally";
@@ -28,7 +28,15 @@ export async function getAllParticipants(c: Context) {
           userId: users.id,
           displayName: users.displayName,
           username: participantProfile.username,
-          totalScore: sustainabilityScore.totalScore,
+          walletAddress: participantProfile.walletAddress,
+          // sustainabilityScore rows are created lazily (on a member's first
+          // scored submission) — a leftJoin + COALESCE keeps brand-new
+          // members with a real profile visible in this list instead of
+          // silently dropping them until their first score lands.
+          totalScore:
+            sql<number>`COALESCE(${sustainabilityScore.totalScore}, 0)`.mapWith(
+              Number,
+            ),
           currentBand: monthlyTally.band,
           currentStreak: userStreaks.currentStreak,
           isMember: participantProfile.isMember,
@@ -37,10 +45,7 @@ export async function getAllParticipants(c: Context) {
         })
         .from(users)
         .innerJoin(participantProfile, eq(participantProfile.userId, users.id))
-        .innerJoin(
-          sustainabilityScore,
-          eq(sustainabilityScore.userId, users.id),
-        )
+        .leftJoin(sustainabilityScore, eq(sustainabilityScore.userId, users.id))
         .leftJoin(
           monthlyTally,
           and(
@@ -54,7 +59,7 @@ export async function getAllParticipants(c: Context) {
             ? sql`${users.displayName} ILIKE ${`%${search}%`} OR ${participantProfile.username} ILIKE ${`%${search}%`}`
             : undefined,
         )
-        .orderBy(desc(sustainabilityScore.totalScore))
+        .orderBy(sql`COALESCE(${sustainabilityScore.totalScore}, 0) DESC`)
         .limit(limit)
         .offset(offset),
 
