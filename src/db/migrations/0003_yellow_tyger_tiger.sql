@@ -1,1 +1,0 @@
-ALTER TABLE "monthly_tally" ADD CONSTRAINT "monthly_tally_user_id_month_unique" UNIQUE("user_id","month");

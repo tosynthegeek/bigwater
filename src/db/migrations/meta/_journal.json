@@ -5,64 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1783516214364,
-      "tag": "0000_narrow_warlock",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1783587622994,
-      "tag": "0001_fearless_pestilence",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1783677449419,
-      "tag": "0002_spicy_ultimates",
-      "breakpoints": true
-    },
-    {
-      "idx": 3,
-      "version": "7",
-      "when": 1783972621191,
-      "tag": "0003_yellow_tyger_tiger",
-      "breakpoints": true
-    },
-    {
-      "idx": 4,
-      "version": "7",
-      "when": 1784009448929,
-      "tag": "0004_talented_fabian_cortez",
-      "breakpoints": true
-    },
-    {
-      "idx": 5,
-      "version": "7",
-      "when": 1784010932844,
-      "tag": "0005_early_greymalkin",
-      "breakpoints": true
-    },
-    {
-      "idx": 6,
-      "version": "7",
-      "when": 1784198843913,
-      "tag": "0006_long_chamber",
-      "breakpoints": true
-    },
-    {
-      "idx": 7,
-      "version": "7",
-      "when": 1784201983508,
-      "tag": "0007_smiling_omega_flight",
-      "breakpoints": true
-    },
-    {
-      "idx": 8,
-      "version": "7",
-      "when": 1784290350131,
-      "tag": "0008_plain_saracen",
+      "when": 1784835356083,
+      "tag": "0000_tough_gertrude_yorkes",
       "breakpoints": true
     }
   ]
