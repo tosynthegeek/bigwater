@@ -1,6 +1,6 @@
 import { desc, eq } from "drizzle-orm";
 import { db } from "@/db";
-import { tasks } from "@/db/schema/bigwater";
+import { tasks } from "@/db/schema/rail2";
 
 export type ActiveTask = {
   id: string;

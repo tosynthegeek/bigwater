@@ -4,16 +4,15 @@ import {
   participantProfile,
   pointsLedger,
   sustainabilityScore,
-  users,
+  authUsers,
   userStreaks,
-} from "@/db/schema/bigwater";
+  type User,
+} from "@/db/schema/rail2";
 import { db } from "@/db";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { format } from "date-fns";
 import { getBandForMonthlyTally } from "@/services/economy/bands";
 import { getTallyPeriod } from "@/services/economy/tally";
-
-export type User = typeof users.$inferSelect;
 
 export async function getAllParticipants(c: Context) {
   const limit = Math.min(parseInt(c.req.query("limit") || "50"), 100);
@@ -25,8 +24,7 @@ export async function getAllParticipants(c: Context) {
     const [participants, stats] = await Promise.all([
       db
         .select({
-          userId: users.id,
-          displayName: users.displayName,
+          userId: authUsers.id,
           username: participantProfile.username,
           totalScore: sustainabilityScore.totalScore,
           currentBand: monthlyTally.band,
@@ -35,23 +33,26 @@ export async function getAllParticipants(c: Context) {
           isFlagged: participantProfile.isFlagged,
           status: participantProfile.status,
         })
-        .from(users)
-        .innerJoin(participantProfile, eq(participantProfile.userId, users.id))
+        .from(authUsers)
+        .innerJoin(
+          participantProfile,
+          eq(participantProfile.userId, authUsers.id),
+        )
         .innerJoin(
           sustainabilityScore,
-          eq(sustainabilityScore.userId, users.id),
+          eq(sustainabilityScore.userId, authUsers.id),
         )
         .leftJoin(
           monthlyTally,
           and(
-            eq(monthlyTally.userId, users.id),
+            eq(monthlyTally.userId, authUsers.id),
             eq(monthlyTally.month, getTallyPeriod(now).key),
           ),
         )
-        .leftJoin(userStreaks, eq(userStreaks.userId, users.id))
+        .leftJoin(userStreaks, eq(userStreaks.userId, authUsers.id))
         .where(
           search
-            ? sql`${users.displayName} ILIKE ${`%${search}%`} OR ${participantProfile.username} ILIKE ${`%${search}%`}`
+            ? sql`${participantProfile.username} ILIKE ${`%${search}%`}`
             : undefined,
         )
         .orderBy(desc(sustainabilityScore.totalScore))
@@ -66,12 +67,15 @@ export async function getAllParticipants(c: Context) {
               Number,
             ),
           activeThisWeek: sql<number>`
-            COUNT(DISTINCT CASE WHEN ${pointsLedger.createdAt} >= NOW() - INTERVAL '7 days' THEN ${users.id} END)
+            COUNT(DISTINCT CASE WHEN ${pointsLedger.createdAt} >= NOW() - INTERVAL '7 days' THEN ${authUsers.id} END)
           `.mapWith(Number),
         })
-        .from(users)
-        .innerJoin(participantProfile, eq(participantProfile.userId, users.id))
-        .leftJoin(pointsLedger, eq(pointsLedger.userId, users.id)),
+        .from(authUsers)
+        .innerJoin(
+          participantProfile,
+          eq(participantProfile.userId, authUsers.id),
+        )
+        .leftJoin(pointsLedger, eq(pointsLedger.userId, authUsers.id)),
     ]);
 
     return c.json({

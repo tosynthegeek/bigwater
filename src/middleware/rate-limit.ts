@@ -42,7 +42,7 @@ export function createRateLimiter({
   });
 }
 
-export const loginRateLimiter = createRateLimiter({
+export const publicRateLimiter = createRateLimiter({
   windowSeconds: 60,
   limit: 10,
   keyPrefix: "login",

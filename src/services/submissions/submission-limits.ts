@@ -2,7 +2,7 @@ import { startOfDayUtc } from "@/utils/time";
 import { SubmissionRejectedError } from "@/utils/errors";
 import { and, count, desc, eq, gte } from "drizzle-orm";
 import { db } from "@/db";
-import { submissions, tasks } from "@/db/schema/bigwater";
+import { submissions, tasks } from "@/db/schema/rail2";
 
 export async function enforceSubmissionLimits(
   userId: string,

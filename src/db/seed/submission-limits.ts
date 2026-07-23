@@ -1,5 +1,5 @@
 import { db } from "@/db";
-import { submissionLimits } from "@/db/schema/bigwater";
+import { submissionLimits } from "@/db/schema/rail2";
 
 export async function seedSubmissionLimits() {
   const existing = await db.query.submissionLimits.findFirst();

@@ -8,7 +8,7 @@ import {
   scoreHistory,
   sustainabilityScore,
   userStreaks,
-} from "@/db/schema/bigwater";
+} from "@/db/schema/rail2";
 
 import { getBandForMonthlyTally } from "./bands";
 import { getBonusForStreak } from "./streaks";

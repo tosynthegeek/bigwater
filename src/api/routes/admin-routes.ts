@@ -21,10 +21,14 @@ import {
   flagParticipant,
   getAllParticipants,
 } from "../controllers/admin-participants-controllers";
-import { getPlatformOverview } from "../controllers/admin-controllers";
+import {
+  adminLogin,
+  getPlatformOverview,
+} from "../controllers/admin-controllers";
 
 const AdminRouter = new Hono();
 
+AdminRouter.get("/login", adminLogin);
 AdminRouter.post("/tasks", createTask);
 AdminRouter.patch("/tasks/:id", updateTask);
 AdminRouter.delete("/tasks/:id", deleteTask);

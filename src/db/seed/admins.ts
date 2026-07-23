@@ -1,6 +1,6 @@
 import { getOrCreateUserByPrivyDid } from "@/services/identity";
 import { db } from "..";
-import { users } from "../schema/bigwater";
+import { authUsers } from "../schema/rail2";
 import { eq } from "drizzle-orm";
 
 export async function seedAdmins() {
@@ -16,9 +16,9 @@ export async function seedAdmins() {
     const user = await getOrCreateUserByPrivyDid(did);
     if (user.role !== "admin" && user.role !== "superadmin") {
       await db
-        .update(users)
+        .update(authUsers)
         .set({ role: "admin" })
-        .where(eq(users.id, user.id));
+        .where(eq(authUsers.id, user.id));
     }
   }
 }

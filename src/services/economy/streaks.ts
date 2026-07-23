@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import { and, asc, gt, lt } from "drizzle-orm";
-import { userStreaks, streakBonuses } from "@/db/schema/bigwater";
+import { userStreaks, streakBonuses } from "@/db/schema/rail2";
 import { eq, sql } from "drizzle-orm";
 import { periodIndex, timeframes } from "./config";
 
