@@ -1,12 +1,12 @@
-import { loginRateLimiter } from "@/middleware/rate-limit";
+import { publicRateLimiter } from "@/middleware/rate-limit";
 import { Hono } from "hono";
-import { createTelegramLinkCode, login } from "../controllers/participants-controllers";
+import { linkRailOne } from "../controllers/participants-controllers";
 
 export const PublicRouter = new Hono();
 
-PublicRouter.get("/login", loginRateLimiter, login);
-PublicRouter.post(
-  "/telegram/link-code",
-  loginRateLimiter,
-  createTelegramLinkCode,
-);
+PublicRouter.get("/link-rail1", publicRateLimiter, linkRailOne);
+
+/*
+User login
+JWT Token -> 
+*/

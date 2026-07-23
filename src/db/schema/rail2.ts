@@ -6,11 +6,16 @@ import {
   integer,
   boolean,
   timestamp,
-  numeric,
+  uuid,
   unique,
   index,
 } from "drizzle-orm/pg-core";
 import { nanoid } from "@/utils/nanoid";
+
+export type ParticipantProfile = typeof participantProfile.$inferSelect;
+export type User = typeof authUsers.$inferSelect & {
+  participantProfile?: ParticipantProfile;
+};
 
 export const userRole = pgEnum("user_role", ["user", "admin", "superadmin"]);
 export const submissionStatus = pgEnum("submission_status", [
@@ -24,12 +29,12 @@ export const submissionSource = pgEnum("submission_source", [
   "telegram",
 ]);
 
-export const users = pgTable("users", {
+export const authUsers = pgTable("auth_accounts", {
   id: varchar("id").primaryKey().$defaultFn(nanoid),
   privyDid: text("privy_did").notNull().unique(),
-  displayName: text("display_name"),
   role: userRole("role").notNull().default("user"),
   status: text("status").notNull().default("active"),
+
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
@@ -43,7 +48,8 @@ export const participantProfile = pgTable("participant_profile", {
   userId: varchar("user_id")
     .notNull()
     .unique()
-    .references(() => users.id, { onDelete: "cascade" }),
+    .references(() => authUsers.id, { onDelete: "cascade" }),
+  rail1UserId: uuid("rail1_user_id").unique(),
   username: text("username"),
   telegramId: text("telegram_id").unique(),
   isMember: boolean("is_member").notNull().default(false),
@@ -78,7 +84,7 @@ export const submissions = pgTable("submissions", {
   id: varchar("id").primaryKey().$defaultFn(nanoid),
   userId: varchar("user_id")
     .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
+    .references(() => authUsers.id, { onDelete: "cascade" }),
   taskId: varchar("task_id")
     .references(() => tasks.id, {
       onDelete: "set null",
@@ -129,7 +135,7 @@ export const pointsLedger = pgTable(
     id: varchar("id").primaryKey().$defaultFn(nanoid),
     userId: varchar("user_id")
       .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
+      .references(() => authUsers.id, { onDelete: "cascade" }),
     submissionId: varchar("submission_id").references(() => submissions.id, {
       onDelete: "set null",
     }),
@@ -145,7 +151,7 @@ export const pointsLedger = pgTable(
 export const sustainabilityScore = pgTable("sustainability_score", {
   userId: varchar("user_id")
     .primaryKey()
-    .references(() => users.id, {
+    .references(() => authUsers.id, {
       onDelete: "cascade",
     }),
   totalScore: integer("total_score").notNull().default(0),
@@ -163,7 +169,7 @@ export const monthlyTally = pgTable(
     id: varchar("id").primaryKey().$defaultFn(nanoid),
     userId: varchar("user_id")
       .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
+      .references(() => authUsers.id, { onDelete: "cascade" }),
     month: varchar("month").notNull(),
     baseTally: integer("base_tally").notNull().default(0),
     band: text("band").notNull().default("seedling"),
@@ -190,7 +196,7 @@ export const monthlyTally = pgTable(
 export const userStreaks = pgTable("user_streaks", {
   userId: varchar("user_id")
     .primaryKey()
-    .references(() => users.id, {
+    .references(() => authUsers.id, {
       onDelete: "cascade",
     }),
 
@@ -215,7 +221,7 @@ export const scoreHistory = pgTable(
     id: varchar("id").primaryKey().$defaultFn(nanoid),
     userId: varchar("user_id")
       .notNull()
-      .references(() => users.id, { onDelete: "cascade" }),
+      .references(() => authUsers.id, { onDelete: "cascade" }),
     month: varchar("month").notNull(),
     tally: integer("tally").notNull(),
     band: text("band").notNull(),
@@ -237,7 +243,7 @@ export const telegramLinkCodes = pgTable("telegram_link_codes", {
   code: text("code").primaryKey(),
   userId: varchar("user_id")
     .notNull()
-    .references(() => users.id, { onDelete: "cascade" }),
+    .references(() => authUsers.id, { onDelete: "cascade" }),
   expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
   consumedAt: timestamp("consumed_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true })

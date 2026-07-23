@@ -1,9 +1,7 @@
 import { privy } from "@/privy";
 import { createMiddleware } from "hono/factory";
 import { getOrCreateUserByPrivyDid } from "@/services/identity";
-import type { users } from "@/db/schema/bigwater";
-
-type User = typeof users.$inferSelect;
+import { type User } from "@/db/schema/rail2";
 
 type Env = {
   Variables: {

@@ -2,7 +2,7 @@ import { type Context } from "hono";
 import { createSubmission } from "@/services/submissions/submissions";
 import { getParticipantProfileByUserId } from "@/services/identity";
 import { db } from "@/db";
-import { submissions, tasks } from "@/db/schema/bigwater";
+import { submissions, tasks } from "@/db/schema/rail2";
 import { eq } from "drizzle-orm";
 import { SubmissionRejectedError } from "@/utils/errors";
 import { getSubmissionLimitStatus } from "@/services/submissions/submission-limits";

@@ -2,18 +2,20 @@ import { db } from "@/db";
 import {
   sustainabilityScore,
   monthlyTally,
-  users,
+  authUsers,
   userStreaks,
   pointsLedger,
-} from "@/db/schema/bigwater";
+  participantProfile,
+} from "@/db/schema/rail2";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { getTallyPeriod, getWeekPeriod } from "./economy/tally";
+import { rail1Users } from "@/db/schema/rail1";
 
 export type LeaderboardTimeframe = "global" | "weekly" | "monthly";
 
 function currentMonthJoin(now: Date) {
   return and(
-    eq(monthlyTally.userId, users.id),
+    eq(monthlyTally.userId, authUsers.id),
     eq(monthlyTally.month, getTallyPeriod(now).key),
   );
 }
@@ -58,20 +60,25 @@ export async function getGlobalLeaderboard(
   const now = new Date();
   return db
     .select({
-      userId: users.id,
-      displayName: users.displayName,
-      points: sustainabilityScore.totalScore,
+      userId: authUsers.id,
+      rail2Points: sustainabilityScore.totalScore,
+      rail1Points: rail1Users.totalPoints,
+      totalPoints: sql<number>`
+        COALESCE(${sustainabilityScore.totalScore}, 0) + 
+        COALESCE(${rail1Users.totalPoints}, 0)
+      `.as("totalPoints"),
       currentBand: monthlyTally.band,
       currentStreak: userStreaks.currentStreak,
       isUser: currentUserId
-        ? sql<boolean>`${users.id} = ${currentUserId}`
+        ? sql<boolean>`${authUsers.id} = ${currentUserId}`
         : sql<boolean>`false`,
     })
     .from(sustainabilityScore)
-    .innerJoin(users, eq(users.id, sustainabilityScore.userId))
+    .innerJoin(authUsers, eq(authUsers.id, sustainabilityScore.userId))
+    .leftJoin(rail1Users, eq(rail1Users.id, participantProfile.rail1UserId))
     .leftJoin(monthlyTally, currentMonthJoin(now))
-    .leftJoin(userStreaks, eq(userStreaks.userId, users.id))
-    .orderBy(desc(sustainabilityScore.totalScore))
+    .leftJoin(userStreaks, eq(userStreaks.userId, authUsers.id))
+    .orderBy(desc(sql`totalPoints`))
     .limit(limit)
     .offset(offset);
 }
@@ -86,31 +93,27 @@ export async function getWeeklyLeaderboard(
 
   return db
     .select({
-      userId: users.id,
-      displayName: users.displayName,
+      userId: authUsers.id,
       points: sql<number>`SUM(${pointsLedger.basePoints})`.as("points"),
+      rail1Points: rail1Users.totalPoints,
       currentBand: monthlyTally.band,
       currentStreak: userStreaks.currentStreak,
       isUser: currentUserId
-        ? sql<boolean>`${users.id} = ${currentUserId}`
+        ? sql<boolean>`${authUsers.id} = ${currentUserId}`
         : sql<boolean>`false`,
     })
     .from(pointsLedger)
-    .innerJoin(users, eq(users.id, pointsLedger.userId))
+    .innerJoin(authUsers, eq(authUsers.id, pointsLedger.userId))
+    .leftJoin(rail1Users, eq(rail1Users.id, participantProfile.rail1UserId))
     .leftJoin(monthlyTally, currentMonthJoin(now))
-    .leftJoin(userStreaks, eq(userStreaks.userId, users.id))
+    .leftJoin(userStreaks, eq(userStreaks.userId, authUsers.id))
     .where(
       and(
         sql`${pointsLedger.createdAt} >= ${start}`,
         sql`${pointsLedger.createdAt} < ${end}`,
       ),
     )
-    .groupBy(
-      users.id,
-      users.displayName,
-      monthlyTally.band,
-      userStreaks.currentStreak,
-    )
+    .groupBy(authUsers.id, monthlyTally.band, userStreaks.currentStreak)
     .orderBy(desc(sql`points`))
     .limit(limit)
     .offset(offset);
@@ -124,18 +127,19 @@ export async function getMonthlyLeaderboard(
 ) {
   return db
     .select({
-      userId: users.id,
-      displayName: users.displayName,
+      userId: authUsers.id,
       points: monthlyTally.baseTally,
+      rail1Points: rail1Users.totalPoints,
       currentBand: monthlyTally.band,
       currentStreak: userStreaks.currentStreak,
       isUser: currentUserId
-        ? sql<boolean>`${users.id} = ${currentUserId}`
+        ? sql<boolean>`${authUsers.id} = ${currentUserId}`
         : sql<boolean>`false`,
     })
     .from(monthlyTally)
-    .innerJoin(users, eq(users.id, monthlyTally.userId))
-    .leftJoin(userStreaks, eq(userStreaks.userId, users.id))
+    .innerJoin(authUsers, eq(authUsers.id, monthlyTally.userId))
+    .leftJoin(rail1Users, eq(rail1Users.id, participantProfile.rail1UserId))
+    .leftJoin(userStreaks, eq(userStreaks.userId, authUsers.id))
     .where(eq(monthlyTally.month, month))
     .orderBy(desc(monthlyTally.baseTally))
     .limit(limit)
@@ -157,16 +161,19 @@ export async function getUserLeaderboardContext(
       current_streak: number | null;
       rank: number;
     }>(sql`
-      SELECT display_name, points, current_band, current_streak, rank FROM (
+      SELECT display_name, points, rail1_points, rail2_points, current_band, current_streak, rank FROM (
         SELECT
           u.id AS user_id,
-          u.display_name,
-          ss.total_score AS points,
+          COALESCE(ss.total_score, 0) + COALESCE(r1.total_points, 0) AS points,
+          r1.total_points AS rail1_points,
+          ss.total_score AS rail2_points,
           mt.band AS current_band,
           us.current_streak,
-          RANK() OVER (ORDER BY ss.total_score DESC) AS rank
+          RANK() OVER (ORDER BY (COALESCE(ss.total_score, 0) + COALESCE(r1.total_points, 0)) DESC) AS rank
         FROM sustainability_score ss
-        INNER JOIN users u ON u.id = ss.user_id
+        INNER JOIN auth_accounts u ON u.id = ss.user_id
+        INNER JOIN participant_profile pp ON pp.user_id = u.id
+        LEFT JOIN users r1 ON r1.id = pp.rail1_user_id
         LEFT JOIN monthly_tally mt ON mt.user_id = u.id AND mt.month = ${getTallyPeriod(now).key}
         LEFT JOIN user_streaks us ON us.user_id = u.id
       ) ranked

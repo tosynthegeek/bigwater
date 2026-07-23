@@ -39,6 +39,8 @@ const envSchema = z.object({
   // services/submissions/submissions.ts) so the review->approve loop is
   // demoable without the external AI verification service. Leave unset in prod.
   DEMO_AUTO_REVIEW: z.string().optional(),
+
+  RAIL1_JWT_SECRET: z.string(),
 });
 
 export default function parseEnv() {

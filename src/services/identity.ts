@@ -2,22 +2,25 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import {
   telegramLinkCodes,
-  users,
+  authUsers,
   participantProfile,
-} from "@/db/schema/bigwater";
+} from "@/db/schema/rail2";
 
 const TELEGRAM_LINK_CODE_TTL_MS = 10 * 60 * 1000;
 
 export async function getOrCreateUserByPrivyDid(privyDid: string) {
-  const existing = await db.query.users.findFirst({
-    where: eq(users.privyDid, privyDid),
+  const existing = await db.query.authUsers.findFirst({
+    where: eq(authUsers.privyDid, privyDid),
+    with: {
+      participantProfile: true,
+    },
   });
 
   if (existing) return existing;
 
   return db.transaction(async (tx) => {
     const [user] = await tx
-      .insert(users)
+      .insert(authUsers)
       .values({
         privyDid,
       })
@@ -42,7 +45,10 @@ export async function getOrCreateUserByPrivyDid(privyDid: string) {
       );
     }
 
-    return user;
+    return {
+      ...user,
+      participantProfile: profile,
+    };
   });
 }
 
@@ -62,8 +68,8 @@ export async function resolveUserByTelegramId(telegramUserId: string) {
     return null;
   }
 
-  const user = db.query.users.findFirst({
-    where: eq(users.id, profile.userId),
+  const user = db.query.authUsers.findFirst({
+    where: eq(authUsers.id, profile.userId),
   });
 
   return user;
@@ -112,11 +118,6 @@ export async function redeemTelegramLinkCode(
       .update(participantProfile)
       .set({ telegramId: telegramUserId, username: username })
       .where(eq(participantProfile.userId, linkCode.userId));
-
-    await tx
-      .update(users)
-      .set({ displayName: username })
-      .where(eq(users.id, linkCode.userId));
 
     await tx
       .update(telegramLinkCodes)

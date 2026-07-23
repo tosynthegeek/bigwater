@@ -5,7 +5,7 @@ import {
   pointsLedger,
   submissions,
   tasks,
-} from "@/db/schema/bigwater";
+} from "@/db/schema/rail2";
 import { eq, sql } from "drizzle-orm";
 import { uploadFileToS3 } from "@/services/s3";
 import { format } from "date-fns";

@@ -2,7 +2,7 @@ import { processApprovedSubmission } from "@/services/economy/score";
 import type { Context } from "hono";
 
 import { db } from "@/db";
-import { participantProfile, submissions, tasks } from "@/db/schema/bigwater";
+import { participantProfile, submissions, tasks } from "@/db/schema/rail2";
 import { desc, eq } from "drizzle-orm";
 import { updateUserStreak } from "@/services/economy/streaks";
 

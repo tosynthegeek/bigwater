@@ -1,11 +1,12 @@
 import { Context } from "hono";
 import { db } from "@/db";
 import {
-  users,
+  authUsers,
   participantProfile,
   submissions,
   pointsLedger,
-} from "@/db/schema/bigwater";
+  type User,
+} from "@/db/schema/rail2";
 import { eq, gte, sql } from "drizzle-orm";
 import { subDays } from "date-fns";
 
@@ -35,11 +36,11 @@ export async function getPlatformOverview(c: Context) {
           .select({
             totalMembers: sql<number>`COUNT(*)`.mapWith(Number),
             newThisWeek: sql<number>`
-            COUNT(CASE WHEN ${users.createdAt} >= ${oneWeekAgoIso} THEN 1 END)
+            COUNT(CASE WHEN ${authUsers.createdAt} >= ${oneWeekAgoIso} THEN 1 END)
           `.mapWith(Number),
           })
           .from(participantProfile)
-          .innerJoin(users, eq(users.id, participantProfile.userId)),
+          .innerJoin(authUsers, eq(authUsers.id, participantProfile.userId)),
 
         db
           .select({
@@ -169,6 +170,30 @@ export async function getPlatformOverview(c: Context) {
     });
   } catch (error) {
     console.error("Admin.getPlatformOverview.error:", error);
+    return c.json({ error: "Internal server error" }, 500);
+  }
+}
+
+export async function adminLogin(c: Context) {
+  const user = c.get("user") as User;
+
+  if (!user) {
+    return c.json({ error: "User not found" }, 404);
+  }
+
+  try {
+    const [admin] = await db
+      .select()
+      .from(authUsers)
+      .where(eq(authUsers.id, user.id));
+
+    if (!admin || admin?.role != "admin") {
+      return c.json({ error: "Unauthorized" }, 404);
+    }
+
+    return c.json({ admin }, 200);
+  } catch (error) {
+    console.error("Controllers.participants-controllers.login.error: ", error);
     return c.json({ error: "Internal server error" }, 500);
   }
 }

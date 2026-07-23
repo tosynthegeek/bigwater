@@ -1,5 +1,5 @@
 import { db } from "@/db";
-import { bands } from "@/db/schema/bigwater";
+import { bands } from "@/db/schema/rail2";
 
 export async function seedBands() {
   const existing = await db.query.bands.findFirst();

@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import { asc } from "drizzle-orm";
-import { bands } from "@/db/schema/bigwater";
+import { bands } from "@/db/schema/rail2";
 
 export async function getBands() {
   return db.query.bands.findMany({

@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import {
+  createTelegramLinkCode,
   getParticipantProfile,
   getParticipantSubmissions,
 } from "@/api/controllers/participants-controllers";
@@ -22,5 +23,6 @@ ApiRouter.get("/participants/submissions", getParticipantSubmissions);
 ApiRouter.get("/submissions/limits", getSubmissionLimitsStatus);
 ApiRouter.get("/submissions/:id", getSubmissionById);
 ApiRouter.get("/leaderboard", leaderboard);
+ApiRouter.post("/telegram/link-code", createTelegramLinkCode);
 
 export default ApiRouter;

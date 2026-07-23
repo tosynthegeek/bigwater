@@ -1,7 +1,7 @@
 import type { Context } from "hono";
 
 import { db } from "@/db";
-import { bands, submissionLimits } from "@/db/schema/bigwater";
+import { bands, submissionLimits } from "@/db/schema/rail2";
 import { updateBandSchema, updateSubmissionLimitsSchema } from "@/zod/config";
 import { asc, eq } from "drizzle-orm";
 
