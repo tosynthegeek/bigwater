@@ -1,4 +1,4 @@
-import { Queue, Worker, type Job } from "bullmq";
+import { Queue, QueueEvents, Worker, type Job } from "bullmq";
 import { db } from "@/db";
 import redisClient from "@/redis";
 import { bankMonthlyScoreForUser } from "../economy/score";
@@ -10,6 +10,9 @@ export const bankingSweepQueue = new Queue<SweepJobData>("banking-sweep", {
   connection: redisClient,
 });
 export const bankingQueue = new Queue<BankJobData>("banking", {
+  connection: redisClient,
+});
+const bankingQueueEvents = new QueueEvents("banking", {
   connection: redisClient,
 });
 
@@ -37,13 +40,25 @@ export const bankingSweepWorker = new Worker<SweepJobData>(
     });
 
     await Promise.all(
-      closed.map((t) =>
-        bankingQueue.add(
+      closed.map(async (t) => {
+        console.log(
+          `[banking-sweep] Queueing banking job for user=${t.userId} month=${t.month}`,
+        );
+
+        const job = await bankingQueue.add(
           "bank",
           { userId: t.userId, month: t.month },
-          { jobId: `bank:${t.userId}:${t.month}` }, // dedup if sweep overlaps a job still in flight
-        ),
-      ),
+          {
+            jobId: `bank:${t.userId}:${t.month}`,
+          },
+        );
+
+        console.log(
+          `[banking-sweep] Added job id=${job.id} user=${t.userId} month=${t.month}`,
+        );
+
+        return job;
+      }),
     );
 
     return { queued: closed.length };
@@ -74,4 +89,16 @@ bankingWorker.on("failed", (job, err) => {
     `banking failed user=${job?.data.userId} month=${job?.data.month}:`,
     err,
   );
+});
+
+bankingQueueEvents.on("waiting", ({ jobId }) => {
+  console.log(`[banking] Job waiting: ${jobId}`);
+});
+
+bankingQueueEvents.on("active", ({ jobId }) => {
+  console.log(`[banking] Job active: ${jobId}`);
+});
+
+bankingQueueEvents.on("completed", ({ jobId }) => {
+  console.log(`[banking] Job completed: ${jobId}`);
 });
