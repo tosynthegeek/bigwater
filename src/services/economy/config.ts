@@ -1,9 +1,11 @@
+import { ONE_MINUTE } from "@/utils/time";
+
 export const timeframes = {
   submissionCooldownMs: Number(
     process.env.SUBMISSION_COOLDOWN_MS ?? 6 * 60 * 60 * 1000,
   ),
   dayPeriodMs: Number(process.env.DAY_PERIOD_MS ?? 24 * 60 * 60 * 1000),
-  tallyPeriodMs: Number(process.env.TALLY_PERIOD_MS ?? 0),
+  tallyPeriodMs: resolveTallyPeriodMs(),
   weeklyPeriodMs: Number(process.env.WEEKLY_PERIOD_MS ?? 0), // 0 = real ISO week (Mon–Sun); >0 = fixed-length period for staging
 };
 
@@ -13,4 +15,11 @@ export function periodIndex(date: Date, periodMs: number) {
   }
 
   return Math.floor(date.getTime() / periodMs);
+}
+
+export function resolveTallyPeriodMs(): number {
+  if (process.env.TALLY_PERIOD_MS) {
+    return Number(process.env.TALLY_PERIOD_MS);
+  }
+  return process.env.NODE_ENV === "production" ? 0 : 60 * ONE_MINUTE;
 }

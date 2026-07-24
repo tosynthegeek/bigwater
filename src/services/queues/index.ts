@@ -8,6 +8,8 @@ import { scheduleStreakSweep, streakSweepWorker } from "./streak.queue";
 export async function startQueues() {
   await scheduleBankingSweep();
   await scheduleStreakSweep();
+
+  console.log("Starting queues...");
 }
 
 export async function stopQueues() {

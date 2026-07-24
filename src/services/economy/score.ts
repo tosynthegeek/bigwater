@@ -32,7 +32,7 @@ export async function processApprovedSubmission(
     month,
   });
 
-  await tx
+  const [tally] = await tx
     .insert(monthlyTally)
     .values({
       userId,
@@ -46,11 +46,8 @@ export async function processApprovedSubmission(
         baseTally: sql`${monthlyTally.baseTally} + ${pointsAwarded}`,
         updatedAt: now,
       },
-    });
-
-  const tally = await tx.query.monthlyTally.findFirst({
-    where: (t, { and, eq }) => and(eq(t.userId, userId), eq(t.month, month)),
-  });
+    })
+    .returning();
 
   if (!tally) {
     throw new Error("Monthly tally not found.");

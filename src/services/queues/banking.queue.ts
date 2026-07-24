@@ -1,6 +1,6 @@
 import { Queue, QueueEvents, Worker, type Job } from "bullmq";
 import { db } from "@/db";
-import redisClient from "@/redis";
+import redisClient, { makeConnection } from "@/redis";
 import { bankMonthlyScoreForUser } from "../economy/score";
 
 type SweepJobData = Record<string, never>;
@@ -13,7 +13,7 @@ export const bankingQueue = new Queue<BankJobData>("banking", {
   connection: redisClient,
 });
 const bankingQueueEvents = new QueueEvents("banking", {
-  connection: redisClient,
+  connection: makeConnection(),
 });
 
 export async function scheduleBankingSweep() {
@@ -38,6 +38,7 @@ export const bankingSweepWorker = new Worker<SweepJobData>(
       where: (t, { and, lte, eq }) =>
         and(lte(t.periodEnd, now), eq(t.isFinalized, false)),
     });
+    console.log(`[banking-sweep] found ${closed.length} closed tallies`);
 
     await Promise.all(
       closed.map(async (t) => {
@@ -63,7 +64,7 @@ export const bankingSweepWorker = new Worker<SweepJobData>(
 
     return { queued: closed.length };
   },
-  { connection: redisClient, concurrency: 1 }, // one sweep at a time is enough — it's just an enumerate+enqueue
+  { connection: makeConnection(), concurrency: 1 }, // one sweep at a time is enough — it's just an enumerate+enqueue
 );
 
 // Banks a single user's tally. Idempotent via the isFinalized claim inside
@@ -76,7 +77,7 @@ export const bankingWorker = new Worker<BankJobData>(
     );
   },
   {
-    connection: redisClient,
+    connection: makeConnection(),
     concurrency: Number(process.env.BANKING_WORKER_CONCURRENCY ?? 10),
   },
 );
@@ -89,14 +90,6 @@ bankingWorker.on("failed", (job, err) => {
     `banking failed user=${job?.data.userId} month=${job?.data.month}:`,
     err,
   );
-});
-
-bankingQueueEvents.on("waiting", ({ jobId }) => {
-  console.log(`[banking] Job waiting: ${jobId}`);
-});
-
-bankingQueueEvents.on("active", ({ jobId }) => {
-  console.log(`[banking] Job active: ${jobId}`);
 });
 
 bankingQueueEvents.on("completed", ({ jobId }) => {
