@@ -16,9 +16,12 @@ import { getTallyPeriod } from "@/services/economy/tally";
 import { verifyRail1Token } from "@/middleware/rail1-jwt";
 
 export async function linkRailOne(c: Context) {
-  const user = c.get("user") as User;
+  const user = c.get("user") as User | null;
   const rail1Token = c.req.header("x-rail1-token");
 
+  if (!user) {
+    return c.json({ error: "unauthenticated" }, 401);
+  }
   if (!rail1Token) {
     return c.json(
       {
@@ -97,8 +100,11 @@ export async function getParticipantProfile(c: Context) {
         walletAddress: participantProfile.walletAddress,
         status: participantProfile.status,
 
-        totalScore: sustainabilityScore.totalScore,
-        headStart: sustainabilityScore.headStart,
+        // sustainabilityScore rows are created lazily (on a member's first
+        // scored submission) — COALESCE keeps a brand-new participant with
+        // no score yet from disappearing from this query entirely.
+        totalScore: sql<number>`COALESCE(${sustainabilityScore.totalScore}, 0)`.mapWith(Number),
+        headStart: sql<number>`COALESCE(${sustainabilityScore.headStart}, 0)`.mapWith(Number),
 
         monthlyTally: monthlyTally.baseTally,
         currentBand: monthlyTally.band,
@@ -115,7 +121,7 @@ export async function getParticipantProfile(c: Context) {
       })
       .from(participantProfile)
       .where(eq(participantProfile.userId, user.id))
-      .innerJoin(
+      .leftJoin(
         sustainabilityScore,
         eq(sustainabilityScore.userId, participantProfile.userId),
       )
@@ -155,16 +161,18 @@ export async function getParticipantSubmissions(c: Context) {
       .select({
         submission: submissions,
         taskTitle: tasks.title,
+        basePoints: tasks.basePoints,
       })
       .from(submissions)
       .leftJoin(tasks, eq(submissions.taskId, tasks.id))
       .where(eq(submissions.userId, user.id))
       .orderBy(desc(submissions.createdAt));
 
-    const result = rows.map(({ submission, taskTitle }) => ({
+    const result = rows.map(({ submission, taskTitle, basePoints }) => ({
       ...submission,
       taskId: submission.taskId ?? "custom",
       taskTitle: taskTitle ?? "Custom",
+      basePoints: basePoints ?? 0,
     }));
 
     return c.json({ submissions: result }, 200);
