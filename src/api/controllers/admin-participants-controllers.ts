@@ -21,16 +21,12 @@ export async function getAllParticipants(c: Context) {
   const now = new Date();
 
   try {
-    const [participants, stats] = await Promise.all([
+    const [participants, stats, activeThisWeekResult] = await Promise.all([
       db
         .select({
           userId: authUsers.id,
           username: participantProfile.username,
           walletAddress: participantProfile.walletAddress,
-          // sustainabilityScore rows are created lazily (on a member's first
-          // scored submission) — a leftJoin + COALESCE keeps brand-new
-          // members with a real profile visible in this list instead of
-          // silently dropping them until their first score lands.
           totalScore:
             sql<number>`COALESCE(${sustainabilityScore.totalScore}, 0)`.mapWith(
               Number,
@@ -74,25 +70,34 @@ export async function getAllParticipants(c: Context) {
             sql<number>`SUM(CASE WHEN ${participantProfile.isFlagged} THEN 1 ELSE 0 END)`.mapWith(
               Number,
             ),
-          activeThisWeek: sql<number>`
-            COUNT(DISTINCT CASE WHEN ${pointsLedger.createdAt} >= NOW() - INTERVAL '7 days' THEN ${authUsers.id} END)
-          `.mapWith(Number),
         })
-        .from(authUsers)
-        .innerJoin(
-          participantProfile,
-          eq(participantProfile.userId, authUsers.id),
-        )
-        .leftJoin(pointsLedger, eq(pointsLedger.userId, authUsers.id)),
+        .from(participantProfile),
+
+      // Active this week (separate query to avoid join multiplication)
+      db
+        .select({
+          count: sql<number>`COUNT(DISTINCT ${pointsLedger.userId})`.mapWith(
+            Number,
+          ),
+        })
+        .from(pointsLedger)
+        .where(sql`${pointsLedger.createdAt} >= NOW() - INTERVAL '7 days'`),
     ]);
+
+    const statsData = stats[0] ?? { totalMembers: 0, flaggedCount: 0 };
+    const activeThisWeek = activeThisWeekResult[0]?.count ?? 0;
 
     return c.json({
       participants,
-      pagination: { limit, offset, hasMore: participants.length === limit },
-      stats: stats[0] ?? {
-        totalMembers: 0,
-        flaggedCount: 0,
-        activeThisWeek: 0,
+      pagination: {
+        limit,
+        offset,
+        hasMore: participants.length === limit,
+      },
+      stats: {
+        totalMembers: statsData.totalMembers,
+        flaggedCount: statsData.flaggedCount,
+        activeThisWeek,
       },
     });
   } catch (error) {

@@ -68,11 +68,13 @@ export async function getGlobalLeaderboard(
       rail2Points: sustainabilityScore.totalScore,
       rail1Points: rail1Users.totalPoints,
       totalPoints: totalPoints.as("totalPoints"),
+      walletAddress: rail1Users.walletAddress,
       currentBand: monthlyTally.band,
       currentStreak: userStreaks.currentStreak,
       isUser: currentUserId
         ? sql<boolean>`${authUsers.id} = ${currentUserId}`
         : sql<boolean>`false`,
+      rank: sql<number>`RANK() OVER (ORDER BY ${totalPoints} DESC)`.as("rank"),
     })
     .from(participantProfile)
     .innerJoin(authUsers, eq(authUsers.id, participantProfile.userId))
@@ -99,11 +101,13 @@ export async function getWeeklyLeaderboard(
       userId: authUsers.id,
       points: pointsExpr.as("points"),
       rail1Points: rail1Users.totalPoints,
+      walletAddress: rail1Users.walletAddress,
       currentBand: monthlyTally.band,
       currentStreak: userStreaks.currentStreak,
       isUser: currentUserId
         ? sql<boolean>`${authUsers.id} = ${currentUserId}`
         : sql<boolean>`false`,
+      rank: sql<number>`RANK() OVER (ORDER BY ${pointsExpr} DESC)`.as("rank"),
     })
     .from(participantProfile)
     .innerJoin(authUsers, eq(authUsers.id, participantProfile.userId))
@@ -140,11 +144,15 @@ export async function getMonthlyLeaderboard(
       userId: authUsers.id,
       points: monthlyTally.baseTally,
       rail1Points: rail1Users.totalPoints,
+      walletAddress: rail1Users.walletAddress,
       currentBand: monthlyTally.band,
       currentStreak: userStreaks.currentStreak,
       isUser: currentUserId
         ? sql<boolean>`${authUsers.id} = ${currentUserId}`
         : sql<boolean>`false`,
+      rank: sql<number>`RANK() OVER (ORDER BY ${monthlyTally.baseTally} DESC)`.as(
+        "rank",
+      ),
     })
     .from(participantProfile)
     .innerJoin(authUsers, eq(authUsers.id, participantProfile.userId))
