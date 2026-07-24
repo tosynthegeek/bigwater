@@ -100,8 +100,11 @@ export async function getParticipantProfile(c: Context) {
         walletAddress: participantProfile.walletAddress,
         status: participantProfile.status,
 
-        totalScore: sustainabilityScore.totalScore,
-        headStart: sustainabilityScore.headStart,
+        // sustainabilityScore rows are created lazily (on a member's first
+        // scored submission) — COALESCE keeps a brand-new participant with
+        // no score yet from disappearing from this query entirely.
+        totalScore: sql<number>`COALESCE(${sustainabilityScore.totalScore}, 0)`.mapWith(Number),
+        headStart: sql<number>`COALESCE(${sustainabilityScore.headStart}, 0)`.mapWith(Number),
 
         monthlyTally: monthlyTally.baseTally,
         currentBand: monthlyTally.band,
@@ -118,7 +121,7 @@ export async function getParticipantProfile(c: Context) {
       })
       .from(participantProfile)
       .where(eq(participantProfile.userId, user.id))
-      .innerJoin(
+      .leftJoin(
         sustainabilityScore,
         eq(sustainabilityScore.userId, participantProfile.userId),
       )
