@@ -22,7 +22,7 @@ function parsePagination(c: Context) {
 export async function leaderboard(c: Context) {
   const user = c.get("user");
   if (!user?.id) return c.json({ error: "Unauthorized" }, 401);
-
+  console.log("user, ", user);
   const timeframe = (c.req.query("timeframe") ??
     "global") as LeaderboardTimeframe;
   if (!TIMEFRAMES.includes(timeframe)) {
