@@ -41,9 +41,15 @@ export async function getAllParticipants(c: Context) {
           isFlagged: participantProfile.isFlagged,
           status: participantProfile.status,
         })
-        .from(users)
-        .innerJoin(participantProfile, eq(participantProfile.userId, authUsers.id))
-        .leftJoin(sustainabilityScore, eq(sustainabilityScore.userId, authUsers.id))
+        .from(authUsers)
+        .innerJoin(
+          participantProfile,
+          eq(participantProfile.userId, authUsers.id),
+        )
+        .leftJoin(
+          sustainabilityScore,
+          eq(sustainabilityScore.userId, authUsers.id),
+        )
         .leftJoin(
           monthlyTally,
           and(
