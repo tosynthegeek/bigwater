@@ -95,3 +95,19 @@ bankingWorker.on("failed", (job, err) => {
 bankingQueueEvents.on("completed", ({ jobId }) => {
   console.log(`[banking] Job completed: ${jobId}`);
 });
+
+bankingWorker.on("ready", () => {
+  console.log("[banking] worker ready");
+});
+
+bankingWorker.on("active", (job) => {
+  console.log("[banking] active", job.id);
+});
+
+bankingWorker.on("completed", (job) => {
+  console.log("[banking] completed", job.id);
+});
+
+bankingWorker.on("error", (err) => {
+  console.error("[banking] worker error", err);
+});
