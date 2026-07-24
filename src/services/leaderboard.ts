@@ -58,15 +58,16 @@ export async function getGlobalLeaderboard(
   currentUserId: string,
 ) {
   const now = new Date();
+  const totalPoints = sql<number>`
+    COALESCE(${sustainabilityScore.totalScore}, 0) + 
+    COALESCE(${rail1Users.totalPoints}, 0)
+  `;
   return db
     .select({
       userId: authUsers.id,
       rail2Points: sustainabilityScore.totalScore,
       rail1Points: rail1Users.totalPoints,
-      totalPoints: sql<number>`
-        COALESCE(${sustainabilityScore.totalScore}, 0) + 
-        COALESCE(${rail1Users.totalPoints}, 0)
-      `.as("totalPoints"),
+      totalPoints: totalPoints.as("totalPoints"),
       currentBand: monthlyTally.band,
       currentStreak: userStreaks.currentStreak,
       isUser: currentUserId
@@ -79,7 +80,7 @@ export async function getGlobalLeaderboard(
     .leftJoin(rail1Users, eq(rail1Users.id, participantProfile.rail1UserId))
     .leftJoin(monthlyTally, currentMonthJoin(now))
     .leftJoin(userStreaks, eq(userStreaks.userId, authUsers.id))
-    .orderBy(desc(sql`totalPoints`))
+    .orderBy(desc(totalPoints))
     .limit(limit)
     .offset(offset);
 }
@@ -91,13 +92,12 @@ export async function getWeeklyLeaderboard(
 ) {
   const now = new Date();
   const { start, end } = getWeekPeriod(now);
+  const pointsExpr = sql<number>`COALESCE(SUM(${pointsLedger.basePoints}), 0)`;
 
   return db
     .select({
       userId: authUsers.id,
-      points: sql<number>`COALESCE(SUM(${pointsLedger.basePoints}), 0)`.as(
-        "points",
-      ),
+      points: pointsExpr.as("points"),
       rail1Points: rail1Users.totalPoints,
       currentBand: monthlyTally.band,
       currentStreak: userStreaks.currentStreak,
@@ -124,7 +124,7 @@ export async function getWeeklyLeaderboard(
       monthlyTally.band,
       userStreaks.currentStreak,
     )
-    .orderBy(desc(sql`points`))
+    .orderBy(desc(pointsExpr))
     .limit(limit)
     .offset(offset);
 }
