@@ -14,6 +14,7 @@ import { db } from "@/db";
 import { and, desc, eq, sql } from "drizzle-orm";
 import { getTallyPeriod } from "@/services/economy/tally";
 import { verifyRail1Token } from "@/middleware/rail1-jwt";
+import { rail1Users } from "@/db/schema/rail1";
 
 export async function linkRailOne(c: Context) {
   const user = c.get("user") as User | null;
@@ -97,14 +98,20 @@ export async function getParticipantProfile(c: Context) {
         username: participantProfile.username,
         isMember: participantProfile.isMember,
         isFlagged: participantProfile.isFlagged,
-        walletAddress: participantProfile.walletAddress,
+        walletAddress: rail1Users.walletAddress,
         status: participantProfile.status,
 
         // sustainabilityScore rows are created lazily (on a member's first
         // scored submission) — COALESCE keeps a brand-new participant with
         // no score yet from disappearing from this query entirely.
-        totalScore: sql<number>`COALESCE(${sustainabilityScore.totalScore}, 0)`.mapWith(Number),
-        headStart: sql<number>`COALESCE(${sustainabilityScore.headStart}, 0)`.mapWith(Number),
+        totalScore:
+          sql<number>`COALESCE(${sustainabilityScore.totalScore}, 0)`.mapWith(
+            Number,
+          ),
+        headStart:
+          sql<number>`COALESCE(${sustainabilityScore.headStart}, 0)`.mapWith(
+            Number,
+          ),
 
         monthlyTally: monthlyTally.baseTally,
         currentBand: monthlyTally.band,
@@ -133,7 +140,8 @@ export async function getParticipantProfile(c: Context) {
           eq(monthlyTally.isFinalized, false),
         ),
       )
-      .leftJoin(userStreaks, eq(userStreaks.userId, user.id));
+      .leftJoin(userStreaks, eq(userStreaks.userId, user.id))
+      .leftJoin(rail1Users, eq(rail1Users.id, participantProfile.rail1UserId));
 
     if (!profile) {
       return c.json({ error: "Profile not found" }, 404);

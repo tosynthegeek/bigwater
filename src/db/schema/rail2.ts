@@ -54,7 +54,6 @@ export const participantProfile = pgTable("participant_profile", {
   telegramId: text("telegram_id").unique(),
   isMember: boolean("is_member").notNull().default(false),
   isFlagged: boolean("is_flagged").notNull().default(false),
-  walletAddress: varchar("wallet_address", { length: 42 }),
   status: text("status").notNull().default("active"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()

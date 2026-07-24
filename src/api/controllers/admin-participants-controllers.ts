@@ -13,6 +13,7 @@ import { and, eq, sql } from "drizzle-orm";
 import { format } from "date-fns";
 import { getBandForMonthlyTally } from "@/services/economy/bands";
 import { getTallyPeriod } from "@/services/economy/tally";
+import { rail1Users } from "@/db/schema/rail1";
 
 export async function getAllParticipants(c: Context) {
   const limit = Math.min(parseInt(c.req.query("limit") || "50"), 100);
@@ -26,7 +27,7 @@ export async function getAllParticipants(c: Context) {
         .select({
           userId: authUsers.id,
           username: participantProfile.username,
-          walletAddress: participantProfile.walletAddress,
+          walletAddress: rail1Users.walletAddress,
           totalScore:
             sql<number>`COALESCE(${sustainabilityScore.totalScore}, 0)`.mapWith(
               Number,
@@ -42,6 +43,7 @@ export async function getAllParticipants(c: Context) {
           participantProfile,
           eq(participantProfile.userId, authUsers.id),
         )
+        .leftJoin(rail1Users, eq(rail1Users.id, participantProfile.rail1UserId))
         .leftJoin(
           sustainabilityScore,
           eq(sustainabilityScore.userId, authUsers.id),

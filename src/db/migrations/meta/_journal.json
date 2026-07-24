@@ -8,6 +8,13 @@
       "when": 1784835356083,
       "tag": "0000_tough_gertrude_yorkes",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1784906218119,
+      "tag": "0001_empty_black_queen",
+      "breakpoints": true
     }
   ]
 }

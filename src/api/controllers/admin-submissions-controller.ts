@@ -5,6 +5,7 @@ import { db } from "@/db";
 import { participantProfile, submissions, tasks } from "@/db/schema/rail2";
 import { desc, eq } from "drizzle-orm";
 import { updateUserStreak } from "@/services/economy/streaks";
+import { rail1Users } from "@/db/schema/rail1";
 
 export async function reviewSubmission(c: Context) {
   const user = c.get("user");
@@ -148,7 +149,7 @@ export async function getReadyForReviewSubmissions(c: Context) {
         taskTitle: tasks.title,
 
         username: participantProfile.username,
-        walletAddress: participantProfile.walletAddress,
+        walletAddress: rail1Users.walletAddress,
       })
       .from(submissions)
       .leftJoin(tasks, eq(submissions.taskId, tasks.id))
@@ -156,6 +157,7 @@ export async function getReadyForReviewSubmissions(c: Context) {
         participantProfile,
         eq(submissions.userId, participantProfile.userId),
       )
+      .leftJoin(rail1Users, eq(rail1Users.id, participantProfile.rail1UserId))
       .where(eq(submissions.status, "under_review"))
       .orderBy(desc(submissions.createdAt));
 
