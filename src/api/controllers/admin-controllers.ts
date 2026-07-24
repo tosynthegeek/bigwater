@@ -187,8 +187,8 @@ export async function adminLogin(c: Context) {
       .from(authUsers)
       .where(eq(authUsers.id, user.id));
 
-    if (!admin || admin?.role != "admin") {
-      return c.json({ error: "Unauthorized" }, 404);
+    if (!admin || (admin.role !== "admin" && admin.role !== "superadmin")) {
+      return c.json({ error: "Unauthorized" }, 403);
     }
 
     return c.json({ admin }, 200);
