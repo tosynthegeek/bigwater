@@ -158,16 +158,18 @@ export async function getParticipantSubmissions(c: Context) {
       .select({
         submission: submissions,
         taskTitle: tasks.title,
+        basePoints: tasks.basePoints,
       })
       .from(submissions)
       .leftJoin(tasks, eq(submissions.taskId, tasks.id))
       .where(eq(submissions.userId, user.id))
       .orderBy(desc(submissions.createdAt));
 
-    const result = rows.map(({ submission, taskTitle }) => ({
+    const result = rows.map(({ submission, taskTitle, basePoints }) => ({
       ...submission,
       taskId: submission.taskId ?? "custom",
       taskTitle: taskTitle ?? "Custom",
+      basePoints: basePoints ?? 0,
     }));
 
     return c.json({ submissions: result }, 200);
