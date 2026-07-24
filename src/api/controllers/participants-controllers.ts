@@ -16,9 +16,12 @@ import { getTallyPeriod } from "@/services/economy/tally";
 import { verifyRail1Token } from "@/middleware/rail1-jwt";
 
 export async function linkRailOne(c: Context) {
-  const user = c.get("user") as User;
+  const user = c.get("user") as User | null;
   const rail1Token = c.req.header("x-rail1-token");
 
+  if (!user) {
+    return c.json({ error: "unauthenticated" }, 401);
+  }
   if (!rail1Token) {
     return c.json(
       {
