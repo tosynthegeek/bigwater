@@ -167,7 +167,6 @@ export async function getUserLeaderboardContext(
 
   if (type === "global") {
     const rows = await db.execute<{
-      display_name: string | null;
       points: number;
       rail1_points: number | null;
       rail2_points: number | null;
@@ -175,10 +174,9 @@ export async function getUserLeaderboardContext(
       current_streak: number | null;
       rank: number;
     }>(sql`
-      SELECT display_name, points, rail1_points, rail2_points, current_band, current_streak, rank FROM (
+      SELECT  points, rail1_points, rail2_points, current_band, current_streak, rank FROM (
         SELECT
           u.id AS user_id,
-          u.display_name,
           COALESCE(ss.total_score, 0) + COALESCE(r1.total_points, 0) AS points,
           r1.total_points AS rail1_points,
           ss.total_score AS rail2_points,
@@ -200,16 +198,14 @@ export async function getUserLeaderboardContext(
   if (type === "weekly") {
     const { start, end } = getWeekPeriod(now);
     const rows = await db.execute<{
-      display_name: string | null;
       points: number;
       current_band: string | null;
       current_streak: number | null;
       rank: number;
     }>(sql`
-      SELECT display_name, points, current_band, current_streak, rank FROM (
+      SELECT points, current_band, current_streak, rank FROM (
         SELECT
           u.id AS user_id,
-          u.display_name,
           COALESCE(SUM(pl.base_points), 0) AS points,
           mt.band AS current_band,
           us.current_streak,
@@ -222,7 +218,7 @@ export async function getUserLeaderboardContext(
           AND pl.created_at < ${end}
         LEFT JOIN monthly_tally mt ON mt.user_id = u.id AND mt.month = ${getTallyPeriod(now).key}
         LEFT JOIN user_streaks us ON us.user_id = u.id
-        GROUP BY u.id, u.display_name, mt.band, us.current_streak
+        GROUP BY u.id, mt.band, us.current_streak
       ) ranked
       WHERE user_id = ${userId}
     `);
@@ -232,16 +228,14 @@ export async function getUserLeaderboardContext(
   if (!month)
     throw new Error("month is required for monthly leaderboard context");
   const rows = await db.execute<{
-    display_name: string | null;
     points: number;
     current_band: string | null;
     current_streak: number | null;
     rank: number;
   }>(sql`
-    SELECT display_name, points, current_band, current_streak, rank FROM (
+    SELECT points, current_band, current_streak, rank FROM (
       SELECT
         u.id AS user_id,
-        u.display_name,
         mt.base_tally AS points,
         mt.band AS current_band,
         us.current_streak,
