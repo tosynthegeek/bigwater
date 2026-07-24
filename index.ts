@@ -1,11 +1,21 @@
 import app from "@/app";
 import { runSeeds } from "@/db/seed";
+import { privy } from "@/privy";
 import { startQueues, stopQueues } from "@/services/queues";
 import parseEnv from "@/zod/env";
 
 parseEnv();
 await runSeeds();
 await startQueues();
+
+// Force Privy's JWKS fetch/cache to happen at boot rather than on the first
+// real auth request — avoids the first few concurrent requests all racing to
+// fetch keys and timing out.
+try {
+  await privy.utils().auth().verifyAccessToken("warmup");
+} catch {
+  // expected — the token is bogus, we only care about triggering the key fetch
+}
 
 const port = Number(Bun.env.PORT ?? 3000);
 

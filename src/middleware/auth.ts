@@ -26,7 +26,8 @@ export const privyAuth = createMiddleware<Env>(async (c, next) => {
     // const user = await getOrCreateUserByPrivyDid(user_id);
 
     c.set("user", user);
-  } catch {
+  } catch (err) {
+    console.error("[privyAuth] token verification failed:", err);
     c.set("user", null);
   }
 
