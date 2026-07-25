@@ -8,14 +8,38 @@ parseEnv();
 await runSeeds();
 await startQueues();
 
-// Force Privy's JWKS fetch/cache to happen at boot rather than on the first
-// real auth request — avoids the first few concurrent requests all racing to
-// fetch keys and timing out.
-try {
-  await privy.utils().auth().verifyAccessToken("warmup");
-} catch {
-  // expected — the token is bogus, we only care about triggering the key fetch
+async function warmupPrivy() {
+  const originalError = console.error;
+  console.error = (...args: any[]) => {
+    const msg = String(args[0] ?? "");
+    if (
+      msg.includes("Failed to verify") ||
+      msg.includes("InvalidAuthTokenError") ||
+      msg.includes("JWT") ||
+      msg.includes("jose")
+    ) {
+      return;
+    }
+    originalError(...args);
+  };
+
+  try {
+    await privy
+      .utils()
+      .auth()
+      .verifyAccessToken(
+        "eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJ3YXJtdXAifQ.invalid",
+      );
+  } catch {
+  } finally {
+    console.error = originalError;
+  }
+
+  await new Promise((r) => setTimeout(r, 300));
+  console.log("[privy] JWKS warmup complete");
 }
+
+await warmupPrivy();
 
 const port = Number(Bun.env.PORT ?? 3000);
 
