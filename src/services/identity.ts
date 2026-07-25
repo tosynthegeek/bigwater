@@ -18,38 +18,57 @@ export async function getOrCreateUserByPrivyDid(privyDid: string) {
 
   if (existing) return existing;
 
-  return db.transaction(async (tx) => {
-    const [user] = await tx
-      .insert(authUsers)
-      .values({
-        privyDid,
-      })
-      .returning();
+  try {
+    return db.transaction(async (tx) => {
+      const [user] = await tx
+        .insert(authUsers)
+        .values({
+          privyDid,
+        })
+        .returning();
 
-    if (!user) {
-      throw new Error(
-        `Insert into users returned no row for privyDid=${privyDid}`,
-      );
-    }
+      if (!user) {
+        const winner = await tx.query.authUsers.findFirst({
+          where: eq(authUsers.privyDid, privyDid),
+          with: { participantProfile: true },
+        });
+        if (!winner) {
+          throw new Error(`Race lost and user still missing for ${privyDid}`);
+        }
+        return winner;
+      }
 
-    const [profile] = await tx
-      .insert(participantProfile)
-      .values({
-        userId: user.id,
-      })
-      .returning();
+      const [profile] = await tx
+        .insert(participantProfile)
+        .values({
+          userId: user.id,
+        })
+        .returning();
 
-    if (!profile) {
-      throw new Error(
-        `Insert into participantProfile returned no row for userId=${user.id}`,
-      );
-    }
+      if (!profile) {
+        const existingProfile = await tx.query.participantProfile.findFirst({
+          where: eq(participantProfile.userId, user.id),
+        });
+        if (!profile) {
+          throw new Error(
+            `Insert into participantProfile returned no row for userId=${user.id}`,
+          );
+        }
+      }
 
-    return {
-      ...user,
-      participantProfile: profile,
-    };
-  });
+      return {
+        ...user,
+        participantProfile: profile,
+      };
+    });
+  } catch (err) {
+    const recovered = await db.query.authUsers.findFirst({
+      where: eq(authUsers.privyDid, privyDid),
+      with: { participantProfile: true },
+    });
+    if (recovered) return recovered;
+    throw err;
+  }
 }
 
 export async function getParticipantProfileByUserId(userId: string) {

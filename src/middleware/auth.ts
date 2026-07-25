@@ -27,8 +27,13 @@ export const privyAuth = createMiddleware<Env>(async (c, next) => {
 
     c.set("user", user);
   } catch (err: any) {
-    const message = (err as Error)?.message ?? "";
-    if (message.includes("Failed to verify") || message.includes("JWKS")) {
+    const message = err?.message ?? "";
+    const isTransientAuth =
+      message.includes("Failed to verify") ||
+      message.includes("JWKS") ||
+      message.includes("JWT");
+
+    if (isTransientAuth) {
       try {
         await new Promise((r) => setTimeout(r, 150));
         const claims = await privy.utils().auth().verifyAccessToken(token);
@@ -38,15 +43,10 @@ export const privyAuth = createMiddleware<Env>(async (c, next) => {
       } catch (retryErr: any) {
         console.error("[privyAuth] token verification failed (after retry)");
         console.error("  message:", retryErr?.message);
-        console.error("  name:", retryErr?.name);
-        console.error("  token preview:", token.slice(0, 30) + "...");
         c.set("user", null);
       }
     } else {
-      console.error("[privyAuth] token verification failed");
-      console.error("  message:", err?.message);
-      console.error("  name:", err?.name);
-      console.error("  token preview:", token.slice(0, 30) + "...");
+      console.error("[privyAuth] auth pipeline error:", message);
       c.set("user", null);
     }
   }
