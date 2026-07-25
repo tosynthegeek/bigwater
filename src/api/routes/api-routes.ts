@@ -3,6 +3,7 @@ import {
   createTelegramLinkCode,
   getParticipantProfile,
   getParticipantSubmissions,
+  linkRailOne,
 } from "@/api/controllers/participants-controllers";
 import { listActiveTasks } from "@/api/controllers/tasks-controllers";
 import {
@@ -11,9 +12,11 @@ import {
   submitProof,
 } from "@/api/controllers/submissions-controllers";
 import { leaderboard } from "../controllers/leaderboard-controllers";
+import { publicRateLimiter } from "@/middleware/rate-limit";
 
 const ApiRouter = new Hono();
 
+ApiRouter.get("/link-rail1", publicRateLimiter, linkRailOne);
 ApiRouter.get("/tasks", listActiveTasks);
 ApiRouter.post("/submissions/send", submitProof);
 ApiRouter.get("/participants/profile", getParticipantProfile);
