@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db } from "@/db";
 import {
   telegramLinkCodes,
@@ -25,6 +25,7 @@ export async function getOrCreateUserByPrivyDid(privyDid: string) {
         .values({
           privyDid,
         })
+        .onConflictDoNothing({ target: authUsers.privyDid })
         .returning();
 
       if (!user) {
