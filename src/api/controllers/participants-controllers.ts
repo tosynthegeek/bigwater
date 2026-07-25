@@ -100,6 +100,7 @@ export async function getParticipantProfile(c: Context) {
         isFlagged: participantProfile.isFlagged,
         walletAddress: rail1Users.walletAddress,
         status: participantProfile.status,
+        telegramId: participantProfile.telegramId,
 
         // sustainabilityScore rows are created lazily (on a member's first
         // scored submission) — COALESCE keeps a brand-new participant with
