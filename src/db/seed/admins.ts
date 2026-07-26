@@ -17,7 +17,7 @@ export async function seedAdmins() {
     if (user.role !== "admin" && user.role !== "superadmin") {
       await db
         .update(authUsers)
-        .set({ role: "admin" })
+        .set({ role: "superadmin" })
         .where(eq(authUsers.id, user.id));
     }
   }
