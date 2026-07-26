@@ -6,7 +6,6 @@ import {
   submissions,
   sustainabilityScore,
   tasks,
-  authUsers,
   userStreaks,
   type User,
 } from "@/db/schema/rail2";

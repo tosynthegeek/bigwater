@@ -1,4 +1,4 @@
-import { eq, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   telegramLinkCodes,
@@ -6,6 +6,7 @@ import {
   participantProfile,
 } from "@/db/schema/rail2";
 import { rail1Users } from "@/db/schema/rail1";
+import { privy } from "@/privy";
 
 const TELEGRAM_LINK_CODE_TTL_MS = 10 * 60 * 1000;
 const TELEGRAM_BOT_CONNECT_POINTS = 50;
@@ -21,7 +22,39 @@ export async function getOrCreateUserByPrivyDid(privyDid: string) {
   if (existing) return existing;
 
   try {
+    const privyUser = await privy.users()._get(privyDid);
+    const userLinkedAccounts = privyUser.linked_accounts;
+    const googleAccount = userLinkedAccounts.find(
+      (a) => a.type === "google_oauth",
+    );
+    const walletAccount = userLinkedAccounts.find((a) => a.type === "wallet");
+    const candidateIdentifiers = [
+      googleAccount?.email?.toLowerCase(),
+      walletAccount?.address?.toLowerCase(),
+    ].filter((v): v is string => Boolean(v));
+
     return db.transaction(async (tx) => {
+      if (candidateIdentifiers.length > 0) {
+        const placeholder = await tx.query.authUsers.findFirst({
+          where: and(
+            inArray(authUsers.privyDid, candidateIdentifiers),
+            eq(authUsers.role, "admin"),
+          ),
+        });
+
+        if (placeholder) {
+          const [claimed] = await tx
+            .update(authUsers)
+            .set({ privyDid })
+            .where(eq(authUsers.id, placeholder.id))
+            .returning();
+
+          if (claimed) {
+            return claimed;
+          }
+        }
+      }
+      
       const [user] = await tx
         .insert(authUsers)
         .values({

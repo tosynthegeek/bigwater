@@ -9,6 +9,7 @@ import {
 } from "@/db/schema/rail2";
 import { eq, gte, sql } from "drizzle-orm";
 import { subDays } from "date-fns";
+import { addAdminBodySchema, revokeAdminSchema } from "@/zod/admin";
 
 function pct(numerator: number, denominator: number) {
   return denominator > 0 ? Math.round((numerator / denominator) * 100) : 0;
@@ -177,8 +178,8 @@ export async function getPlatformOverview(c: Context) {
 export async function adminLogin(c: Context) {
   const user = c.get("user") as User;
 
-  if (!user) {
-    return c.json({ error: "User not found" }, 404);
+  if (!user || (user.role != "superadmin" && user.role != "admin")) {
+    return c.json({ error: "Unauthorized access" }, 401);
   }
 
   try {
@@ -193,7 +194,90 @@ export async function adminLogin(c: Context) {
 
     return c.json({ admin }, 200);
   } catch (error) {
-    console.error("Controllers.participants-controllers.login.error: ", error);
+    console.error("AdminControllers.adminLogin.error: ", error);
+    return c.json({ error: "Internal server error" }, 500);
+  }
+}
+
+export async function addAdmin(c: Context) {
+  const user = c.get("user") as User;
+
+  if (!user || (user.role !== "admin" && user.role !== "superadmin")) {
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+
+  const body = await c.req.json();
+
+  const validatedBody = addAdminBodySchema.safeParse(body);
+  if (!validatedBody.success) {
+    return c.json(
+      {
+        error: "Invalid request body",
+        details: validatedBody.error.issues,
+      },
+      400,
+    );
+  }
+
+  const { identifier } = validatedBody.data;
+
+  try {
+    const [created] = await db
+      .insert(authUsers)
+      .values({
+        privyDid: identifier,
+        role: "admin",
+      })
+      .returning();
+
+    return c.json({ admin: created }, 201);
+  } catch (error) {
+    console.error("AdminControllers.addAdmin.error: ", error);
+    return c.json({ error: "Internal server error" }, 500);
+  }
+}
+
+export async function revokeAdmin(c: Context) {
+  const user = c.get("user") as User;
+
+  if (!user) {
+    return c.json({ error: "User not found" }, 404);
+  }
+
+  if (user.role != "superadmin") {
+    return c.json({ error: "Not authorized" }, 403);
+  }
+
+  const body = await c.req.json();
+  const parsed = revokeAdminSchema.safeParse(body);
+  if (!parsed.success) {
+    return c.json(
+      { error: "Invalid request body", details: parsed.error.issues },
+      400,
+    );
+  }
+
+  if (parsed.data.id === user.id) {
+    return c.json({ error: "Cannot revoke your own admin access" }, 400);
+  }
+
+  try {
+    const [revoked] = await db
+      .update(authUsers)
+      .set({
+        role: "user",
+        status: "inactive",
+      })
+      .where(eq(authUsers.id, parsed.data.id))
+      .returning();
+
+    if (!revoked) {
+      return c.json({ error: "User not found" }, 404);
+    }
+
+    return c.json({ revoked }, 200);
+  } catch (error) {
+    console.error("AdminControllers.revokeAdmin.error: ", error);
     return c.json({ error: "Internal server error" }, 500);
   }
 }

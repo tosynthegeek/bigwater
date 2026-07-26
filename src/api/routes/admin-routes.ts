@@ -22,8 +22,10 @@ import {
   getAllParticipants,
 } from "../controllers/admin-participants-controllers";
 import {
+  addAdmin,
   adminLogin,
   getPlatformOverview,
+  revokeAdmin,
 } from "../controllers/admin-controllers";
 
 const AdminRouter = new Hono();
@@ -48,5 +50,7 @@ AdminRouter.get("/participants", getAllParticipants);
 AdminRouter.patch("/participants/:userId/flag", flagParticipant);
 AdminRouter.post("/participants/:userId/points", adjustParticipantPoints);
 AdminRouter.get("/overview", getPlatformOverview);
+AdminRouter.post("/add", addAdmin);
+AdminRouter.post("/revoke", revokeAdmin);
 
 export default AdminRouter;
