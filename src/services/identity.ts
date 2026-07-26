@@ -52,7 +52,7 @@ export async function getOrCreateUserByPrivyDid(privyDid: string) {
         const existingProfile = await tx.query.participantProfile.findFirst({
           where: eq(participantProfile.userId, user.id),
         });
-        if (!profile) {
+        if (!existingProfile) {
           throw new Error(
             `Insert into participantProfile returned no row for userId=${user.id}`,
           );
