@@ -1,12 +1,14 @@
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db } from "@/db";
 import {
   telegramLinkCodes,
   authUsers,
   participantProfile,
 } from "@/db/schema/rail2";
+import { rail1Users } from "@/db/schema/rail1";
 
 const TELEGRAM_LINK_CODE_TTL_MS = 10 * 60 * 1000;
+const TELEGRAM_BOT_CONNECT_POINTS = 50;
 
 export async function getOrCreateUserByPrivyDid(privyDid: string) {
   const existing = await db.query.authUsers.findFirst({
@@ -134,6 +136,16 @@ export async function redeemTelegramLinkCode(
       return { ok: false, reason: "telegram_already_linked" } as const;
     }
 
+    // `alreadyLinked` above only guards the incoming Telegram account —
+    // it doesn't stop a user who previously linked a different Telegram
+    // account from getting awarded again. Read this user's own current
+    // value before the update to tell "first-ever link" apart from
+    // "switched to a different Telegram account".
+    const targetProfile = await tx.query.participantProfile.findFirst({
+      where: eq(participantProfile.userId, linkCode.userId),
+    });
+    const isFirstLink = !targetProfile?.telegramId;
+
     await tx
       .update(participantProfile)
       .set({ telegramId: telegramUserId, username: username })
@@ -143,6 +155,30 @@ export async function redeemTelegramLinkCode(
       .update(telegramLinkCodes)
       .set({ consumedAt: new Date() })
       .where(eq(telegramLinkCodes.code, code));
+
+    if (isFirstLink) {
+      if (targetProfile?.rail1UserId) {
+        // Deliberate cross-boundary write: rail1's `users.total_points` is
+        // the same balance every quest claim in bigw-api feeds into. Both
+        // services share one Postgres instance (already relied on for the
+        // leaderboard join), so this is a direct, same-transaction update
+        // rather than a new service call.
+        await tx
+          .update(rail1Users)
+          .set({
+            totalPoints: sql`${rail1Users.totalPoints} + ${TELEGRAM_BOT_CONNECT_POINTS}`,
+          })
+          .where(eq(rail1Users.id, targetProfile.rail1UserId));
+      } else {
+        // rail1Link() runs on every login (ConnectButton.tsx), but is
+        // best-effort — if it never succeeded for this user, we don't know
+        // which rail1 row to credit. Telegram linking itself still
+        // succeeds; just log so a missed award is discoverable.
+        console.warn(
+          `Telegram bot connected for userId=${linkCode.userId} but no rail1UserId is linked — skipped the ${TELEGRAM_BOT_CONNECT_POINTS}-point award.`,
+        );
+      }
+    }
 
     return { ok: true, userId: linkCode.userId } as const;
   });
