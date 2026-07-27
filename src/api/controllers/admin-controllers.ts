@@ -185,7 +185,16 @@ export async function adminLogin(c: Context) {
 
   try {
     const [admin] = await db
-      .select()
+      .select({
+        id: authUsers.id,
+        privyDid: authUsers.privyDid,
+        role: authUsers.role,
+        status: authUsers.status,
+        email: authUsers.email,
+        wallet: authUsers.walletAddress,
+        createdAt: authUsers.createdAt,
+        updatedAt: authUsers.updatedAt,
+      })
       .from(authUsers)
       .where(eq(authUsers.id, user.id));
 
