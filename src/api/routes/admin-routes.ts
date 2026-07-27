@@ -24,6 +24,7 @@ import {
 import {
   addAdmin,
   adminLogin,
+  getAllAdmins,
   getPlatformOverview,
   revokeAdmin,
 } from "../controllers/admin-controllers";
@@ -50,6 +51,7 @@ AdminRouter.get("/participants", getAllParticipants);
 AdminRouter.patch("/participants/:userId/flag", flagParticipant);
 AdminRouter.post("/participants/:userId/points", adjustParticipantPoints);
 AdminRouter.get("/overview", getPlatformOverview);
+AdminRouter.get("/admins", getAllAdmins);
 AdminRouter.post("/add", addAdmin);
 AdminRouter.post("/revoke", revokeAdmin);
 

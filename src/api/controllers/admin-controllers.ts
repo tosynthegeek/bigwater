@@ -7,7 +7,7 @@ import {
   pointsLedger,
   type User,
 } from "@/db/schema/rail2";
-import { eq, gte, sql } from "drizzle-orm";
+import { desc, eq, gte, inArray, sql } from "drizzle-orm";
 import { subDays } from "date-fns";
 import { addAdminBodySchema, revokeAdminSchema } from "@/zod/admin";
 
@@ -195,6 +195,28 @@ export async function adminLogin(c: Context) {
     return c.json({ admin }, 200);
   } catch (error) {
     console.error("AdminControllers.adminLogin.error: ", error);
+    return c.json({ error: "Internal server error" }, 500);
+  }
+}
+
+export async function getAllAdmins(c: Context) {
+  try {
+    const admins = await db
+      .select({
+        id: authUsers.id,
+        privyDid: authUsers.privyDid,
+        role: authUsers.role,
+        status: authUsers.status,
+        createdAt: authUsers.createdAt,
+        updatedAt: authUsers.updatedAt,
+      })
+      .from(authUsers)
+      .where(inArray(authUsers.role, ["admin", "superadmin"]))
+      .orderBy(desc(authUsers.createdAt));
+
+    return c.json({ admins });
+  } catch (error) {
+    console.error("AdminControllers.getAllAdmins.error: ", error);
     return c.json({ error: "Internal server error" }, 500);
   }
 }
