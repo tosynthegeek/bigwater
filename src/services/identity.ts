@@ -39,7 +39,7 @@ export async function getOrCreateUserByPrivyDid(privyDid: string) {
         const placeholder = await tx.query.authUsers.findFirst({
           where: and(
             inArray(sql`lower(${authUsers.privyDid})`, candidateIdentifiers),
-            eq(authUsers.role, "admin"),
+            inArray(authUsers.role, ["admin", "superadmin"]),
           ),
         });
 

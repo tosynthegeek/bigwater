@@ -44,8 +44,8 @@ export async function seedAdmins() {
         .insert(authUsers)
         .values({
           privyDid: normalizedIdentifier,
-          email: parsed.email ?? null,
-          walletAddress: parsed.walletAddress ?? null,
+          // email: parsed.email ?? null,
+          // walletAddress: parsed.walletAddress ?? null,
           role: "superadmin",
         })
         .onConflictDoNothing({ target: authUsers.privyDid });
