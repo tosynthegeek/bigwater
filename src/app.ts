@@ -96,7 +96,7 @@ app.get("/uploads/:filename", async (c) => {
 app.use("/api/*", privyAuth);
 app.use("/api/*", requireAuth);
 
-app.use("/api/admin/*", requireAdmin);
+app.use("/api/admin/*", privyAuth, requireAdmin);
 app.use("/internal/*", requireServiceAuth);
 
 app.route("/api/admin", AdminRouter);
