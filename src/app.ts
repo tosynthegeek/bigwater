@@ -12,11 +12,13 @@ import {
   requireAuth,
   requireAdmin,
   requireServiceAuth,
+  adminLoginAuth,
 } from "@/middleware/auth";
 
 import ApiRouter from "@/api/routes/api-routes";
 import AdminRouter from "./api/routes/admin-routes";
 import InternalRouter from "./api/routes/internal-routes";
+import { adminLogin } from "./api/controllers/admin-controllers";
 
 const app = new Hono();
 
@@ -93,6 +95,7 @@ app.get("/uploads/:filename", async (c) => {
   return new Response(file);
 });
 
+app.use("/api/admin/login", adminLoginAuth, adminLogin);
 app.use("/api/*", privyAuth);
 app.use("/api/*", requireAuth);
 

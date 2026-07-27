@@ -32,7 +32,6 @@ import {
 
 const AdminRouter = new Hono();
 
-AdminRouter.get("/login", adminLogin);
 AdminRouter.post("/tasks", createTask);
 AdminRouter.patch("/tasks/:id", updateTask);
 AdminRouter.delete("/tasks/:id", deleteTask);

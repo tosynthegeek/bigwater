@@ -21,6 +21,50 @@ export async function getOrCreateUserByPrivyDid(privyDid: string) {
 
   if (existing) return existing;
 
+  return db.transaction(async (tx) => {
+    const [user] = await tx
+      .insert(authUsers)
+      .values({
+        privyDid,
+      })
+      .returning();
+
+    if (!user) {
+      throw new Error(
+        `Insert into users returned no row for privyDid=${privyDid}`,
+      );
+    }
+
+    const [profile] = await tx
+      .insert(participantProfile)
+      .values({
+        userId: user.id,
+      })
+      .returning();
+
+    if (!profile) {
+      throw new Error(
+        `Insert into participantProfile returned no row for userId=${user.id}`,
+      );
+    }
+
+    return {
+      ...user,
+      participantProfile: profile,
+    };
+  });
+}
+
+export async function getOrcreateAdminByPrivyDid(privyDid: string) {
+  const existing = await db.query.authUsers.findFirst({
+    where: eq(authUsers.privyDid, privyDid),
+    with: {
+      participantProfile: true,
+    },
+  });
+
+  if (existing) return existing;
+
   try {
     const privyUser = await privy.users()._get(privyDid);
     const userLinkedAccounts = privyUser.linked_accounts;
@@ -35,74 +79,37 @@ export async function getOrCreateUserByPrivyDid(privyDid: string) {
     );
 
     return db.transaction(async (tx) => {
-      if (candidateIdentifiers.length > 0) {
-        const placeholder = await tx.query.authUsers.findFirst({
-          where: and(
-            inArray(sql`lower(${authUsers.privyDid})`, candidateIdentifiers),
-            inArray(authUsers.role, ["admin", "superadmin"]),
-          ),
-        });
+      if (candidateIdentifiers.length < 1) {
+        throw new Error(`No admin with id ${privyDid}`);
+      }
+      const placeholder = await tx.query.authUsers.findFirst({
+        where: and(
+          inArray(sql`lower(${authUsers.privyDid})`, candidateIdentifiers),
+          inArray(authUsers.role, ["admin", "superadmin"]),
+        ),
+      });
 
-        const updates: Partial<typeof authUsers.$inferInsert> = { privyDid };
-        if (email) updates.email = email;
-        if (walletAddress) updates.walletAddress = walletAddress;
-
-        if (placeholder) {
-          const [claimed] = await tx
-            .update(authUsers)
-            .set(updates)
-            .where(eq(authUsers.id, placeholder.id))
-            .returning();
-
-          if (claimed) {
-            return claimed;
-          }
-        }
+      if (!placeholder) {
+        throw new Error(
+          `No admin with id or placeholder ${candidateIdentifiers}`,
+        );
       }
 
-      const [user] = await tx
-        .insert(authUsers)
-        .values({ privyDid, email, walletAddress })
-        .onConflictDoNothing({ target: authUsers.privyDid })
+      const updates: Partial<typeof authUsers.$inferInsert> = { privyDid };
+      if (email) updates.email = email;
+      if (walletAddress) updates.walletAddress = walletAddress;
+
+      const [claimed] = await tx
+        .update(authUsers)
+        .set(updates)
+        .where(eq(authUsers.id, placeholder.id))
         .returning();
 
-      if (!user) {
-        const winner = await tx.query.authUsers.findFirst({
-          where: eq(authUsers.privyDid, privyDid),
-          with: { participantProfile: true },
-        });
-        if (!winner) {
-          throw new Error(`Race lost and user still missing for ${privyDid}`);
-        }
-        return winner;
+      if (!claimed) {
+        throw new Error(`No admin with id ${privyDid}`);
       }
 
-      if (user.role === "admin" || user.role === "superadmin") {
-        return { ...user, participantProfile: null };
-      }
-
-      const [profile] = await tx
-        .insert(participantProfile)
-        .values({
-          userId: user.id,
-        })
-        .returning();
-
-      if (!profile) {
-        const existingProfile = await tx.query.participantProfile.findFirst({
-          where: eq(participantProfile.userId, user.id),
-        });
-        if (!existingProfile) {
-          throw new Error(
-            `Insert into participantProfile returned no row for userId=${user.id}`,
-          );
-        }
-      }
-
-      return {
-        ...user,
-        participantProfile: profile,
-      };
+      return claimed;
     });
   } catch (err) {
     const recovered = await db.query.authUsers.findFirst({
