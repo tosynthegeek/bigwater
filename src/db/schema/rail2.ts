@@ -11,6 +11,7 @@ import {
   index,
 } from "drizzle-orm/pg-core";
 import { nanoid } from "@/utils/nanoid";
+import { email } from "zod";
 
 export type ParticipantProfile = typeof participantProfile.$inferSelect;
 export type User = typeof authUsers.$inferSelect & {
@@ -34,7 +35,8 @@ export const authUsers = pgTable("auth_accounts", {
   privyDid: text("privy_did").notNull().unique(),
   role: userRole("role").notNull().default("user"),
   status: text("status").notNull().default("active"),
-
+  email: text("email").unique(),
+  walletAddress: text("wallet_address").unique(),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

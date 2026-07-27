@@ -28,10 +28,11 @@ export async function getOrCreateUserByPrivyDid(privyDid: string) {
       (a) => a.type === "google_oauth",
     );
     const walletAccount = userLinkedAccounts.find((a) => a.type === "wallet");
-    const candidateIdentifiers = [
-      googleAccount?.email?.toLowerCase(),
-      walletAccount?.address?.toLowerCase(),
-    ].filter((v): v is string => Boolean(v));
+    const email = googleAccount?.email?.toLowerCase();
+    const walletAddress = walletAccount?.address?.toLowerCase();
+    const candidateIdentifiers = [email, walletAddress].filter(
+      (v): v is string => Boolean(v),
+    );
 
     return db.transaction(async (tx) => {
       if (candidateIdentifiers.length > 0) {
@@ -42,10 +43,14 @@ export async function getOrCreateUserByPrivyDid(privyDid: string) {
           ),
         });
 
+        const updates: Partial<typeof authUsers.$inferInsert> = { privyDid };
+        if (email) updates.email = email;
+        if (walletAddress) updates.walletAddress = walletAddress;
+
         if (placeholder) {
           const [claimed] = await tx
             .update(authUsers)
-            .set({ privyDid })
+            .set(updates)
             .where(eq(authUsers.id, placeholder.id))
             .returning();
 
@@ -54,12 +59,10 @@ export async function getOrCreateUserByPrivyDid(privyDid: string) {
           }
         }
       }
-      
+
       const [user] = await tx
         .insert(authUsers)
-        .values({
-          privyDid,
-        })
+        .values({ privyDid, email, walletAddress })
         .onConflictDoNothing({ target: authUsers.privyDid })
         .returning();
 
@@ -72,6 +75,10 @@ export async function getOrCreateUserByPrivyDid(privyDid: string) {
           throw new Error(`Race lost and user still missing for ${privyDid}`);
         }
         return winner;
+      }
+
+      if (user.role === "admin" || user.role === "superadmin") {
+        return { ...user, participantProfile: null };
       }
 
       const [profile] = await tx

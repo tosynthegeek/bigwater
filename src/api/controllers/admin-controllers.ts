@@ -7,9 +7,10 @@ import {
   pointsLedger,
   type User,
 } from "@/db/schema/rail2";
-import { desc, eq, gte, inArray, sql } from "drizzle-orm";
+import { and, desc, eq, gte, inArray, or, sql } from "drizzle-orm";
 import { subDays } from "date-fns";
 import { addAdminBodySchema, revokeAdminSchema } from "@/zod/admin";
+import { email } from "zod";
 
 function pct(numerator: number, denominator: number) {
   return denominator > 0 ? Math.round((numerator / denominator) * 100) : 0;
@@ -206,6 +207,8 @@ export async function getAllAdmins(c: Context) {
         id: authUsers.id,
         privyDid: authUsers.privyDid,
         role: authUsers.role,
+        email: authUsers.email,
+        wallet: authUsers.walletAddress,
         status: authUsers.status,
         createdAt: authUsers.createdAt,
         updatedAt: authUsers.updatedAt,
@@ -300,6 +303,39 @@ export async function revokeAdmin(c: Context) {
     return c.json({ revoked }, 200);
   } catch (error) {
     console.error("AdminControllers.revokeAdmin.error: ", error);
+    return c.json({ error: "Internal server error" }, 500);
+  }
+}
+
+export async function getAdmin(c: Context) {
+  const user = c.get("user") as User;
+
+  if (!user) {
+    return c.json({ error: "User not found" }, 404);
+  }
+
+  if (!user || (user.role != "superadmin" && user.role != "admin")) {
+    return c.json({ error: "Unauthorized access" }, 401);
+  }
+
+  try {
+    const [admin] = await db
+      .select()
+      .from(authUsers)
+      .where(
+        and(
+          eq(authUsers.id, user.id),
+          or(eq(authUsers.role, "admin"), eq(authUsers.role, "superadmin")),
+        ),
+      );
+
+    if (!admin) {
+      return c.json({ error: "Admin not found" }, 404);
+    }
+
+    return c.json({ admin }, 200);
+  } catch (error) {
+    console.error("AdminControllers.getAdmin.error: ", error);
     return c.json({ error: "Internal server error" }, 500);
   }
 }

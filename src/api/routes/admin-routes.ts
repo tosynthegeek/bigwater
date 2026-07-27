@@ -24,6 +24,7 @@ import {
 import {
   addAdmin,
   adminLogin,
+  getAdmin,
   getAllAdmins,
   getPlatformOverview,
   revokeAdmin,
@@ -54,5 +55,6 @@ AdminRouter.get("/overview", getPlatformOverview);
 AdminRouter.get("/admins", getAllAdmins);
 AdminRouter.post("/add", addAdmin);
 AdminRouter.post("/revoke", revokeAdmin);
+AdminRouter.get("/profile", getAdmin);
 
 export default AdminRouter;
