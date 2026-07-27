@@ -325,7 +325,7 @@ export async function getAdmin(c: Context) {
       .where(
         and(
           eq(authUsers.id, user.id),
-          or(eq(authUsers.role, "admin"), eq(authUsers.role, "superadmin")),
+          inArray(authUsers.role, ["admin", "superadmin"]),
         ),
       );
 
