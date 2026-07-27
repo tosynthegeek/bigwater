@@ -22,9 +22,17 @@ const identifierSchema = z.union([
 ]);
 
 export const addAdminBodySchema = z.object({
-  identifier: z.string().min(1, "identifier is required"),
+  identifier: identifierSchema,
 });
 
 export const revokeAdminSchema = z.object({
   id: z.string(),
 });
+
+export function parseIdentifier(identifier: string) {
+  const result = identifierSchema.safeParse(identifier);
+  if (!result.success) {
+    throw new Error(`Invalid identifier: ${identifier}`);
+  }
+  return result.data;
+}

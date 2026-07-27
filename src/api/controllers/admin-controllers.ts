@@ -244,7 +244,8 @@ export async function addAdmin(c: Context) {
     );
   }
 
-  const { identifier } = validatedBody.data;
+  const { email, walletAddress } = validatedBody.data.identifier;
+  const identifier = (email ?? walletAddress)!;
 
   try {
     const [created] = await db
