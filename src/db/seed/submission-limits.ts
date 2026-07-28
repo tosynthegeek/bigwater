@@ -9,7 +9,7 @@ export async function seedSubmissionLimits() {
   }
 
   await db.insert(submissionLimits).values({
-    cooldownHours: 6,
+    cooldownHours: 21600000,
     maxSubmissionsPerDay: 4,
     maxHighValuePerDay: 1,
     monthlyTallyCap: 1000,

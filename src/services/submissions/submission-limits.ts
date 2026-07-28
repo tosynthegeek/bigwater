@@ -24,9 +24,9 @@ export async function enforceSubmissionLimits(
 
   if (latestSubmission) {
     const elapsedMs = now.getTime() - latestSubmission.createdAt.getTime();
-    const cooldownMs = limits.cooldownHours * 60 * 60 * 1000;
+    const cooldownMs = limits.cooldownHours;
     if (elapsedMs < cooldownMs) {
-      const minutesLeft = Math.ceil((cooldownMs - elapsedMs) / 1000 / 60);
+      const minutesLeft = Math.ceil((cooldownMs - elapsedMs) / 60_000);
       throw new SubmissionRejectedError(
         `You must wait ${minutesLeft} more minutes before submitting again.`,
         429,
@@ -98,7 +98,7 @@ export async function getSubmissionLimitStatus(userId: string) {
     orderBy: desc(submissions.createdAt),
   });
 
-  const cooldownMs = limits.cooldownHours * 60 * 60 * 1000;
+  const cooldownMs = limits.cooldownHours;
 
   let remainingSeconds = 0;
   let nextSubmissionAt: Date | null = null;

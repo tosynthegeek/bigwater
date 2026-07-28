@@ -1,9 +1,6 @@
 import { ONE_MINUTE } from "@/utils/time";
 
 export const timeframes = {
-  submissionCooldownMs: Number(
-    process.env.SUBMISSION_COOLDOWN_MS ?? 6 * 60 * 60 * 1000,
-  ),
   dayPeriodMs: Number(process.env.DAY_PERIOD_MS ?? 24 * 60 * 60 * 1000),
   tallyPeriodMs: resolveTallyPeriodMs(),
   weeklyPeriodMs: Number(process.env.WEEKLY_PERIOD_MS ?? 0), // 0 = real ISO week (Mon–Sun); >0 = fixed-length period for staging
