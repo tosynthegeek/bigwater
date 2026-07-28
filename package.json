@@ -11,6 +11,7 @@
     "typescript": "^5"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^0.115.0",
     "@aws-sdk/client-s3": "^3.1082.0",
     "@bull-board/api": "^8.1.0",
     "@bull-board/hono": "^8.1.0",
