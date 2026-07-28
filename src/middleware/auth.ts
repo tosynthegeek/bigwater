@@ -1,6 +1,9 @@
 import { privy } from "@/privy";
 import { createMiddleware } from "hono/factory";
-import { getOrCreateUserByPrivyDid } from "@/services/identity";
+import {
+  getOrcreateAdminByPrivyDid,
+  getOrCreateUserByPrivyDid,
+} from "@/services/identity";
 import { type User } from "@/db/schema/rail2";
 
 type Env = {
@@ -38,6 +41,49 @@ export const privyAuth = createMiddleware<Env>(async (c, next) => {
         await new Promise((r) => setTimeout(r, 150));
         const claims = await privy.utils().auth().verifyAccessToken(token);
         const user = await getOrCreateUserByPrivyDid(claims.user_id);
+        c.set("user", user);
+        return next();
+      } catch (retryErr: any) {
+        console.error("[privyAuth] token verification failed (after retry)");
+        console.error("  message:", retryErr?.message);
+        c.set("user", null);
+      }
+    } else {
+      console.error("[privyAuth] auth pipeline error:", message);
+      c.set("user", null);
+    }
+  }
+
+  return next();
+});
+
+export const adminLoginAuth = createMiddleware<Env>(async (c, next) => {
+  const authHeader = c.req.header("authorization");
+  const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
+
+  if (!token) {
+    c.set("user", null);
+    console.log("no token found");
+    return next();
+  }
+
+  try {
+    const claims = await privy.utils().auth().verifyAccessToken(token);
+    const user = await getOrcreateAdminByPrivyDid(claims.user_id);
+
+    c.set("user", user);
+  } catch (err: any) {
+    const message = err?.message ?? "";
+    const isTransientAuth =
+      message.includes("Failed to verify") ||
+      message.includes("JWKS") ||
+      message.includes("JWT");
+
+    if (isTransientAuth) {
+      try {
+        await new Promise((r) => setTimeout(r, 150));
+        const claims = await privy.utils().auth().verifyAccessToken(token);
+        const user = await getOrcreateAdminByPrivyDid(claims.user_id);
         c.set("user", user);
         return next();
       } catch (retryErr: any) {
