@@ -22,6 +22,7 @@ export async function linkRailOne(c: Context) {
   if (!user) {
     return c.json({ error: "unauthenticated" }, 401);
   }
+
   if (!rail1Token) {
     return c.json(
       {
@@ -31,12 +32,14 @@ export async function linkRailOne(c: Context) {
       400,
     );
   }
+
   if (!user.participantProfile) {
     return c.json(
-      { error: "no_profile", message: "participant profile not found" },
+      { error: "no_profile", message: "participant profile not found", user },
       500,
     );
   }
+
   if (user.participantProfile.rail1UserId) {
     return c.json({
       linked: true,
@@ -51,10 +54,11 @@ export async function linkRailOne(c: Context) {
       .set({ rail1UserId })
       .where(eq(participantProfile.id, user.participantProfile.id))
       .returning();
+
     if (!updated) {
-      return c.json({ error: "User not found" }, 404);
+      return c.json({ error: "partcipant not found for user not found" }, 404);
     }
-    return c.json({ linked: true, rail1UserId: updated.rail1UserId });
+    return c.json({ linked: true, rail1UserId: updated.rail1UserId, user });
   } catch (err) {
     return c.json(
       { error: "invalid_rail1_token", message: (err as Error).message },
