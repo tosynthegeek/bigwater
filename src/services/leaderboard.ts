@@ -169,6 +169,7 @@ export async function getMonthlyLeaderboard(
     .limit(limit)
     .offset(offset);
 }
+
 export async function getUserLeaderboardContext(
   userId: string,
   type: "global" | "weekly" | "monthly" = "global",

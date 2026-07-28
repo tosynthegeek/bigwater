@@ -108,10 +108,9 @@ export async function getParticipantProfile(c: Context) {
         // sustainabilityScore rows are created lazily (on a member's first
         // scored submission) — COALESCE keeps a brand-new participant with
         // no score yet from disappearing from this query entirely.
-        totalScore:
-          sql<number>`COALESCE(${sustainabilityScore.totalScore}, 0)`.mapWith(
-            Number,
-          ),
+        totalScore: sql<number>`
+      COALESCE(${sustainabilityScore.totalScore}, 0) + COALESCE(${rail1Users.totalPoints}, 0)
+    `.mapWith(Number),
         headStart:
           sql<number>`COALESCE(${sustainabilityScore.headStart}, 0)`.mapWith(
             Number,
@@ -124,11 +123,21 @@ export async function getParticipantProfile(c: Context) {
         currentStreak: userStreaks.currentStreak,
         longestStreak: userStreaks.longestStreak,
 
-        globalRank: sql<number>`
-        (SELECT RANK() OVER (ORDER BY total_score DESC) 
-         FROM sustainability_score 
-         WHERE user_id = ${user.id})
-      `.as("global_rank"),
+        globalRank: sql<number>`(
+      SELECT rank FROM (
+        SELECT
+          pp2.user_id,
+          RANK() OVER (
+            ORDER BY (COALESCE(ss2.total_score, 0) + COALESCE(r1_2.total_points, 0)) DESC
+          ) AS rank
+        FROM participant_profile pp2
+        LEFT JOIN sustainability_score ss2 ON ss2.user_id = pp2.user_id
+        LEFT JOIN users r1_2 ON r1_2.id = pp2.rail1_user_id
+      ) ranked
+      WHERE ranked.user_id = ${user.id}
+    )`
+          .mapWith(Number)
+          .as("global_rank"),
       })
       .from(participantProfile)
       .where(eq(participantProfile.userId, user.id))
