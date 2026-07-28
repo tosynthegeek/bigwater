@@ -14,7 +14,7 @@ export async function checkTaskRelevance(image: File, taskDescription: string) {
   const mediaType = toSupportedMediaType(image.type);
 
   const message = await anthropic.messages.create({
-    model: "claude-sonnet-5",
+    model: Bun.env.CLAUDE_MODEL,
     max_tokens: 200,
     messages: [
       {

@@ -41,6 +41,11 @@ const envSchema = z.object({
   DEMO_AUTO_REVIEW: z.string().optional(),
 
   RAIL1_JWT_SECRET: z.string(),
+
+  SIGHTENGINE_USER: z.string(),
+  SIGHTENGINE_SECRET: z.string(),
+  ANTHROPIC_API_KEY: z.string(),
+  CLAUDE_MODEL: z.string().default("claude-sonnet-5"),
 });
 
 export default function parseEnv() {

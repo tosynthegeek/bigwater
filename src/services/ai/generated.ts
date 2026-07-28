@@ -9,8 +9,8 @@ export async function checkAiGenerated(image: File) {
   const form = new FormData();
   form.append("media", image, image.name);
   form.append("models", "genai");
-  form.append("api_user", process.env.SIGHTENGINE_USER!);
-  form.append("api_secret", process.env.SIGHTENGINE_SECRET!);
+  form.append("api_user", Bun.env.SIGHTENGINE_USER);
+  form.append("api_secret", Bun.env.SIGHTENGINE_SECRET);
 
   const res = await fetch("https://api.sightengine.com/1.0/check.json", {
     method: "POST",
