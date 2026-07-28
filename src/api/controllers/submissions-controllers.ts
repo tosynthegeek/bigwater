@@ -40,11 +40,15 @@ export async function submitProof(c: Context) {
       "web",
     );
 
-    await submissionEvaluationQueue.add("evaluate", {
-      submissionId: submission.id,
-      imageUrl: submission.imageUrl,
-      taskDescription: task.description,
-    });
+    await submissionEvaluationQueue.add(
+      "evaluate",
+      {
+        submissionId: submission.id,
+        imageUrl: submission.imageUrl,
+        taskDescription: task.description,
+      },
+      { jobId: submission.id },
+    );
 
     return c.json({ submission }, 201);
   } catch (error) {

@@ -1,9 +1,8 @@
-import {
-  scheduleBankingSweep,
-  bankingSweepWorker,
-  bankingWorker,
-} from "./banking.queue";
-import { scheduleStreakSweep, streakSweepWorker } from "./streak.queue";
+import { bankingSweepWorker, bankingWorker } from "../workers/banking.workers";
+import { submissionEvaluationWorker } from "../workers/evaluation.workers";
+import { streakSweepWorker } from "../workers/streak.workers";
+import { scheduleBankingSweep } from "./banking.queue";
+import { scheduleStreakSweep } from "./streak.queue";
 
 export async function startQueues() {
   await scheduleBankingSweep();
@@ -17,5 +16,6 @@ export async function stopQueues() {
     bankingSweepWorker.close(),
     bankingWorker.close(),
     streakSweepWorker.close(),
+    submissionEvaluationWorker.close(),
   ]);
 }

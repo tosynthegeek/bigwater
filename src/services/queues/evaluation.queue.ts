@@ -1,6 +1,4 @@
-// queues/submission-evaluation.ts
-import { Queue, Worker } from "bullmq";
-import { evaluateSubmission } from "../ai/evaluate";
+import { Queue } from "bullmq";
 import { makeConnection } from "@/redis";
 
 export const submissionEvaluationQueue = new Queue("submission-evaluation", {
@@ -18,28 +16,3 @@ export type SubmissionEvaluationJobData = {
   imageUrl: string;
   taskDescription: string;
 };
-
-export const submissionEvaluationWorker =
-  new Worker<SubmissionEvaluationJobData>(
-    "submission-evaluation",
-    async (job) => {
-      const { submissionId, imageUrl, taskDescription } = job.data;
-      await evaluateSubmission(submissionId, imageUrl, taskDescription);
-    },
-    {
-      connection: makeConnection(),
-      concurrency: 5,
-    },
-  );
-
-submissionEvaluationWorker.on("failed", (job, err) => {
-  console.error(`Submission evaluation job ${job?.id} failed:`, err.message);
-});
-
-submissionEvaluationWorker.on("completed", (job) => {
-  console.log("Submission evaluation job completed", job.id);
-});
-
-submissionEvaluationWorker.on("error", (err) => {
-  console.error("Submission evaluation job worker error", err);
-});

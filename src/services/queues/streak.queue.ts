@@ -1,11 +1,10 @@
-import { Queue, Worker } from "bullmq";
-import redisClient from "@/redis";
-import { runStreakBreakSweep } from "../economy/streaks";
+import { Queue } from "bullmq";
+import { makeConnection } from "@/redis";
 
-type SweepJobData = Record<string, never>;
+export type SweepJobData = Record<string, never>;
 
 export const streakSweepQueue = new Queue<SweepJobData>("streak-sweep", {
-  connection: redisClient,
+  connection: makeConnection(),
 });
 
 export async function scheduleStreakSweep() {
@@ -18,15 +17,3 @@ export async function scheduleStreakSweep() {
     },
   );
 }
-
-export const streakSweepWorker = new Worker<SweepJobData>(
-  "streak-sweep",
-  async () => {
-    await runStreakBreakSweep();
-  },
-  { connection: redisClient, concurrency: 1 },
-);
-
-streakSweepWorker.on("failed", (job, err) => {
-  console.error(`streak-sweep failed job=${job?.id}:`, err);
-});
