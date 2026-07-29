@@ -7,6 +7,7 @@ import { eq } from "drizzle-orm";
 import { SubmissionRejectedError } from "@/utils/errors";
 import { getSubmissionLimitStatus } from "@/services/submissions/submission-limits";
 import { updateSubmissionAiConfidenceSchema } from "@/zod/submission";
+import { submissionEvaluationQueue } from "@/services/queues/evaluation.queue";
 
 export async function submitProof(c: Context) {
   const user = c.get("user");
@@ -32,9 +33,22 @@ export async function submitProof(c: Context) {
       return c.json({ error: "Profile not found" }, 404);
     }
 
-    const submission = await createSubmission(user.id, taskId, file, "web");
+    const { submission, task } = await createSubmission(
+      user.id,
+      taskId,
+      file,
+      "web",
+    );
 
-    // call the ai model
+    await submissionEvaluationQueue.add(
+      "evaluate",
+      {
+        submissionId: submission.id,
+        imageUrl: submission.imageUrl,
+        taskDescription: task.description,
+      },
+      { jobId: submission.id },
+    );
 
     return c.json({ submission }, 201);
   } catch (error) {
