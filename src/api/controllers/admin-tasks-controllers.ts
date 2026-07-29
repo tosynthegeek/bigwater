@@ -66,7 +66,7 @@ export async function updateTask(c: Context) {
   }
 }
 
-export async function deleteTask(c: Context) {
+export async function deactivateTask(c: Context) {
   const taskId = c.req.param("id");
 
   if (!taskId) {
@@ -82,14 +82,67 @@ export async function deleteTask(c: Context) {
       return c.json({ error: "Task not found" }, 404);
     }
 
-    const [deletedTask] = await db
-      .delete(tasks)
+    const [deactivatedTask] = await db
+      .update(tasks)
+      .set({
+        active: false,
+      })
       .where(eq(tasks.id, taskId))
       .returning();
 
-    return c.json({ task: deletedTask });
+    return c.json({ task: deactivatedTask });
   } catch (error) {
-    console.error("AdminTasks.Controllers.deleteTaskController.error: ", error);
+    console.error(
+      "AdminTasks.Controllers.deactivateTaskController.error: ",
+      error,
+    );
+
+    return c.json({ error: "Internal server error" }, 500);
+  }
+}
+
+export async function getAllTasks(c: Context) {
+  try {
+    const allTasks = await db.query.tasks.findMany();
+
+    return c.json({ tasks: allTasks });
+  } catch (error) {
+    console.error("AdminTasks.Controllers.getAllTasksController.error:", error);
+
+    return c.json({ error: "Internal server error" }, 500);
+  }
+}
+
+export async function activateTask(c: Context) {
+  const taskId = c.req.param("id");
+
+  if (!taskId) {
+    return c.json({ error: "Task ID is required" }, 400);
+  }
+
+  try {
+    const existingTask = await db.query.tasks.findFirst({
+      where: eq(tasks.id, taskId),
+    });
+
+    if (!existingTask) {
+      return c.json({ error: "Task not found" }, 404);
+    }
+
+    const [activatedTask] = await db
+      .update(tasks)
+      .set({
+        active: true,
+      })
+      .where(eq(tasks.id, taskId))
+      .returning();
+
+    return c.json({ task: activatedTask });
+  } catch (error) {
+    console.error(
+      "AdminTasks.Controllers.activateTaskController.error:",
+      error,
+    );
 
     return c.json({ error: "Internal server error" }, 500);
   }

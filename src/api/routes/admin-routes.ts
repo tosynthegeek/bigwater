@@ -1,8 +1,10 @@
 import { Hono } from "hono";
 import { getCustomSubmissions } from "@/api/controllers/submissions-controllers";
 import {
+  activateTask,
   createTask,
-  deleteTask,
+  deactivateTask,
+  getAllTasks,
   updateTask,
 } from "@/api/controllers/admin-tasks-controllers";
 import {
@@ -32,9 +34,11 @@ import {
 
 const AdminRouter = new Hono();
 
+AdminRouter.get("/tasks", getAllTasks);
 AdminRouter.post("/tasks", createTask);
 AdminRouter.patch("/tasks/:id", updateTask);
-AdminRouter.delete("/tasks/:id", deleteTask);
+AdminRouter.patch("/tasks/:id/activate", activateTask);
+AdminRouter.patch("/tasks/:id/deactivate", deactivateTask);
 
 AdminRouter.get("/submission-limits", getSubmissionLimits);
 AdminRouter.patch("/submission-limits", updateSubmissionLimits);

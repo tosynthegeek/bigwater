@@ -115,7 +115,11 @@ export async function getParticipantProfile(c: Context) {
           sql<number>`COALESCE(${sustainabilityScore.headStart}, 0)`.mapWith(
             Number,
           ),
-
+        rail2score:
+          sql<number>`COALESCE(${sustainabilityScore.totalScore}, 0)`.mapWith(
+            Number,
+          ),
+        rail1score: rail1Users.totalPoints,
         monthlyTally: monthlyTally.baseTally,
         currentBand: monthlyTally.band,
         multiplier: monthlyTally.multiplier,

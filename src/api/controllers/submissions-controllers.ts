@@ -33,6 +33,13 @@ export async function submitProof(c: Context) {
       return c.json({ error: "Profile not found" }, 404);
     }
 
+    if (profile.isFlagged) {
+      return c.json(
+        { error: "Your account has been flagged and cannot submit proofs." },
+        403,
+      );
+    }
+
     const { submission, task } = await createSubmission(
       user.id,
       taskId,
