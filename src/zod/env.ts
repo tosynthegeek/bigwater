@@ -44,8 +44,8 @@ const envSchema = z.object({
 
   SIGHTENGINE_USER: z.string(),
   SIGHTENGINE_SECRET: z.string(),
-  ANTHROPIC_API_KEY: z.string(),
-  CLAUDE_MODEL: z.string().default("claude-sonnet-5"),
+  OPENROUTER_API_KEY: z.string(),
+  OPENROUTER_MODEL: z.string().default("qwen/qwen3.6-flash"),
 });
 
 export default function parseEnv() {

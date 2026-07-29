@@ -1,8 +1,10 @@
-import Anthropic from "@anthropic-ai/sdk";
+import OpenAI from "openai";
 import z from "zod";
 
-const anthropic = new Anthropic();
-
+const openrouter = new OpenAI({
+  apiKey: Bun.env.OPENROUTER_API_KEY,
+  baseURL: "https://openrouter.ai/api/v1",
+});
 const relevanceSchema = z.object({
   score: z.number().min(0).max(100),
   sentence: z.string(),
@@ -11,18 +13,18 @@ const relevanceSchema = z.object({
 export async function checkTaskRelevance(image: File, taskDescription: string) {
   const buf = await image.arrayBuffer();
   const base64 = Buffer.from(buf).toString("base64");
-  const mediaType = toSupportedMediaType(image.type);
+  const mediaType = image.type;
 
-  const message = await anthropic.messages.create({
-    model: Bun.env.CLAUDE_MODEL,
+  const completion = await openrouter.chat.completions.create({
+    model: Bun.env.OPENROUTER_MODEL,
     max_tokens: 200,
     messages: [
       {
         role: "user",
         content: [
           {
-            type: "image",
-            source: { type: "base64", media_type: mediaType, data: base64 },
+            type: "image_url",
+            image_url: { url: `data:${mediaType};base64,${base64}` },
           },
           {
             type: "text",
@@ -33,21 +35,6 @@ export async function checkTaskRelevance(image: File, taskDescription: string) {
     ],
   });
 
-  const text = message.content.find((b) => b.type === "text")?.text ?? "{}";
+  const text = completion.choices[0]?.message?.content ?? "{}";
   return relevanceSchema.parse(JSON.parse(text));
-}
-
-const SUPPORTED_IMAGE_TYPES = [
-  "image/jpeg",
-  "image/png",
-  "image/gif",
-  "image/webp",
-] as const;
-type SupportedImageType = (typeof SUPPORTED_IMAGE_TYPES)[number];
-
-function toSupportedMediaType(mimeType: string): SupportedImageType {
-  if ((SUPPORTED_IMAGE_TYPES as readonly string[]).includes(mimeType)) {
-    return mimeType as SupportedImageType;
-  }
-  throw new Error(`Unsupported image type for Claude vision: ${mimeType}`);
 }

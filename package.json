@@ -28,6 +28,7 @@
     "hono-rate-limiter": "^0.5.3",
     "ioredis": "^5.11.1",
     "nanoid": "^5.1.16",
+    "openai": "^7.1.0",
     "pg": "^8.22.0",
     "postgres": "^3.4.9",
     "uuid": "^14.0.1",
