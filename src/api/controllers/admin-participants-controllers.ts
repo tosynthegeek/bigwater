@@ -110,7 +110,8 @@ export async function getAllParticipants(c: Context) {
 
 export async function flagParticipant(c: Context) {
   const admin = c.get("user") as User;
-  if (!admin || admin.role !== "admin") {
+
+  if (!admin || (admin.role != "superadmin" && admin.role != "admin")) {
     return c.json({ error: "Admin access required" }, 403);
   }
 
@@ -160,7 +161,7 @@ export async function flagParticipant(c: Context) {
 
 export async function adjustParticipantPoints(c: Context) {
   const admin = c.get("user") as User;
-  if (!admin || admin.role !== "admin") {
+  if (!admin || (admin.role != "superadmin" && admin.role != "admin")) {
     return c.json({ error: "Admin access required" }, 403);
   }
 
