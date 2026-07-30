@@ -14,6 +14,7 @@ import { and, desc, eq, sql } from "drizzle-orm";
 import { getTallyPeriod } from "@/services/economy/tally";
 import { verifyRail1Token } from "@/middleware/rail1-jwt";
 import { rail1Users } from "@/db/schema/rail1";
+import { getBandForMonthlyTally } from "@/services/economy/bands";
 
 export async function linkRailOne(c: Context) {
   const user = c.get("user") as User | null;
@@ -162,6 +163,13 @@ export async function getParticipantProfile(c: Context) {
 
     if (!profile) {
       return c.json({ error: "Profile not found" }, 404);
+    }
+
+    if (profile.currentBand === null) {
+      const fallbackBand = await getBandForMonthlyTally(0);
+      profile.monthlyTally = 0;
+      profile.currentBand = fallbackBand.name;
+      profile.multiplier = fallbackBand.multiplier;
     }
 
     return c.json({ profile }, 200);

@@ -7,16 +7,17 @@ import {
 } from "date-fns";
 import { periodIndex, timeframes } from "./config";
 
-export function getTallyPeriod(date: Date) {
+export function getTallyPeriod(date: Date = new Date()) {
   if (timeframes.tallyPeriodMs > 0) {
     const idx = periodIndex(date, timeframes.tallyPeriodMs);
     return {
       key: `p${idx}`,
+      start: new Date(idx * timeframes.tallyPeriodMs),
       end: new Date((idx + 1) * timeframes.tallyPeriodMs),
     };
   }
   const start = startOfMonth(date);
-  return { key: format(start, "yyyy-MM"), end: addMonths(start, 1) };
+  return { key: format(start, "yyyy-MM"), start, end: addMonths(start, 1) };
 }
 
 export function getWeekPeriod(date: Date) {
