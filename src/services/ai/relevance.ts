@@ -27,6 +27,7 @@ function buildRelevanceMessages(
   base64: string,
   mediaType: string,
   taskDescription: string,
+  taskTitle: string,
 ) {
   return [
     {
@@ -34,11 +35,33 @@ function buildRelevanceMessages(
       content: [
         {
           type: "image_url" as const,
-          image_url: { url: `data:${mediaType};base64,${base64}` },
+          image_url: {
+            url: `data:${mediaType};base64,${base64}`,
+          },
         },
         {
           type: "text" as const,
-          text: `Task: "${taskDescription}"\n\nRate 0-100 how well this image satisfies the task. Respond ONLY with JSON, no markdown fences: {"score": <0-100>, "sentence": "<one sentence justification>"}`,
+          text: `
+            Task Title: ${taskTitle}
+            Task Description:
+            ${taskDescription}
+
+            Evaluate how well this image satisfies the task.
+
+            Return ONLY valid JSON in the following format:
+
+            {
+              "score": <integer between 0 and 100>,
+              "sentence": "<one concise sentence explaining the score>"
+            }
+
+            Scoring guidelines:
+            - 90-100: Clearly completes the task.
+            - 70-89: Mostly completes the task with minor issues.
+            - 40-69: Some relation to the task but significant issues.
+            - 1-39: Weakly related or poor evidence.
+            - 0: Completely unrelated.
+          `.trim(),
         },
       ],
     },
@@ -50,18 +73,28 @@ async function callModelForRelevance(
   base64: string,
   mediaType: string,
   taskDescription: string,
+  taskTitle: string,
 ) {
   const completion = await openrouter.chat.completions.create({
     model,
     max_tokens: 200,
-    messages: buildRelevanceMessages(base64, mediaType, taskDescription),
+    messages: buildRelevanceMessages(
+      base64,
+      mediaType,
+      taskDescription,
+      taskTitle,
+    ),
   });
 
   const text = completion.choices[0]?.message?.content ?? "{}";
   return relevanceSchema.parse(JSON.parse(text));
 }
 
-export async function checkTaskRelevance(image: File, taskDescription: string) {
+export async function checkTaskRelevance(
+  image: File,
+  taskDescription: string,
+  taskTitle: string,
+) {
   const buf = await image.arrayBuffer();
   const base64 = Buffer.from(buf).toString("base64");
   const mediaType = image.type;
@@ -71,6 +104,7 @@ export async function checkTaskRelevance(image: File, taskDescription: string) {
     base64,
     mediaType,
     taskDescription,
+    taskTitle,
   );
 }
 
@@ -78,6 +112,7 @@ export async function checkTaskRelevanceAcrossModels(
   submissionId: string,
   image: File,
   taskDescription: string,
+  taskTitle: string,
 ) {
   const buf = await image.arrayBuffer();
   const base64 = Buffer.from(buf).toString("base64");
@@ -95,6 +130,7 @@ export async function checkTaskRelevanceAcrossModels(
         base64,
         mediaType,
         taskDescription,
+        taskTitle,
       );
 
       perModelResults.set(model, {
