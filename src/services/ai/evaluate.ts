@@ -1,6 +1,9 @@
 import { db } from "@/db";
 import { checkAiGenerated } from "./generated";
-import { checkTaskRelevance } from "./relevance";
+import {
+  checkTaskRelevance,
+  checkTaskRelevanceAcrossModels,
+} from "./relevance";
 import { submissions } from "@/db/schema/rail2";
 import { eq } from "drizzle-orm";
 
@@ -23,6 +26,8 @@ export async function evaluateSubmission(
   const [aiGenResult, relevanceResult] = await Promise.allSettled([
     checkAiGenerated(file),
     checkTaskRelevance(file, taskDescription),
+
+    checkTaskRelevanceAcrossModels(submissionId, file, taskDescription),
   ]);
 
   const authenticity =
