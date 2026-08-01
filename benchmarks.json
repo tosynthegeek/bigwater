@@ -1,0 +1,93 @@
+{
+  "runs": [
+    {
+      "id": "6042f218-3e5e-49e3-a89b-00a5c61c8100",
+      "timestamp": "2026-08-01T10:43:48.446Z",
+      "taskTitle": "Plant a Tree",
+      "taskDescription": "\nTake a picture of yourself planting a tree.\n",
+      "results": [
+        {
+          "model": "google/gemini-2.5-flash-lite",
+          "success": true,
+          "aiConfidence": 90,
+          "aiVerdict": 90,
+          "sentence": "The image clearly depicts multiple hands planting a small tree, which aligns well with the task of planting a tree.",
+          "latencyMs": 2727.187859,
+          "usage": {
+            "promptTokens": 1454,
+            "completionTokens": 45,
+            "totalTokens": 1499
+          },
+          "finishReason": "stop",
+          "rawResponse": "```json\n{\n  \"score\": 90,\n  \"sentence\": \"The image clearly depicts multiple hands planting a small tree, which aligns well with the task of planting a tree.\"\n}\n```"
+        },
+        {
+          "model": "qwen/qwen3.6-flash",
+          "success": true,
+          "aiConfidence": 90,
+          "aiVerdict": 90,
+          "sentence": "The image clearly depicts the action of planting a tree with multiple hands tending to the soil, satisfying the core requirement of the task, although it shows a group effort rather than a single person 'yourself'.",
+          "latencyMs": 49806.895478,
+          "usage": {
+            "promptTokens": 431,
+            "completionTokens": 2083,
+            "totalTokens": 2514
+          },
+          "finishReason": "stop",
+          "rawResponse": "{\n  \"score\": 90,\n  \"sentence\": \"The image clearly depicts the action of planting a tree with multiple hands tending to the soil, satisfying the core requirement of the task, although it shows a group effort rather than a single person 'yourself'.\"\n}"
+        },
+        {
+          "model": "anthropic/claude-sonnet-4.6",
+          "success": true,
+          "aiConfidence": 62,
+          "aiVerdict": 62,
+          "sentence": "The image shows multiple people planting a tree together, which relates to the task, but no single identifiable person is visible (only hands are shown) and it appears to be a stock photo rather than a personal photo.",
+          "latencyMs": 4250.203882000002,
+          "usage": {
+            "promptTokens": 539,
+            "completionTokens": 70,
+            "totalTokens": 609
+          },
+          "finishReason": "stop",
+          "rawResponse": "```json\n{\n  \"score\": 62,\n  \"sentence\": \"The image shows multiple people planting a tree together, which relates to the task, but no single identifiable person is visible (only hands are shown) and it appears to be a stock photo rather than a personal photo.\"\n}\n```"
+        },
+        {
+          "model": "deepseek/deepseek-v3.2",
+          "success": false,
+          "latencyMs": 0,
+          "error": "404 No endpoints found that support image input"
+        },
+        {
+          "model": "openai/gpt-5.4-nano",
+          "success": true,
+          "aiConfidence": 95,
+          "aiVerdict": 95,
+          "sentence": "The image clearly shows multiple people planting a small tree sapling in soil, providing strong visual evidence of the task.",
+          "latencyMs": 1163.076635000005,
+          "usage": {
+            "promptTokens": 454,
+            "completionTokens": 41,
+            "totalTokens": 495
+          },
+          "finishReason": "stop",
+          "rawResponse": "{\n  \"score\": 95,\n  \"sentence\": \"The image clearly shows multiple people planting a small tree sapling in soil, providing strong visual evidence of the task.\"\n}"
+        },
+        {
+          "model": "meta-llama/llama-4-scout",
+          "success": true,
+          "aiConfidence": 70,
+          "aiVerdict": 70,
+          "sentence": "The image shows a group of people planting a tree, but it does not show the person taking the picture.",
+          "latencyMs": 2867.429103000002,
+          "usage": {
+            "promptTokens": 877,
+            "completionTokens": 41,
+            "totalTokens": 918
+          },
+          "finishReason": "stop",
+          "rawResponse": "```json\n{\n  \"score\": 70,\n  \"sentence\": \"The image shows a group of people planting a tree, but it does not show the person taking the picture.\"\n}\n```"
+        }
+      ]
+    }
+  ]
+}
