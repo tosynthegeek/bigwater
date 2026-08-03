@@ -42,8 +42,6 @@ const envSchema = z.object({
 
   RAIL1_JWT_SECRET: z.string(),
 
-  SIGHTENGINE_USER: z.string(),
-  SIGHTENGINE_SECRET: z.string(),
   OPENROUTER_API_KEY: z.string(),
   OPENROUTER_MODEL: z.string().default("qwen/qwen3.6-flash"),
 });

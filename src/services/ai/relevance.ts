@@ -5,13 +5,11 @@ const openrouter = new OpenAI({
   apiKey: Bun.env.OPENROUTER_API_KEY,
   baseURL: "https://openrouter.ai/api/v1",
 });
-const relevanceSchema = z.object({
+
+const evaluationSchema = z.object({
   score: z.number().min(0).max(100),
   sentence: z.string(),
 });
-
-import { randomUUID } from "crypto";
-import { appendBenchmarkRun } from "@/utils/benchmark";
 
 type ModelRelevanceResult = {
   model: string;
@@ -79,25 +77,54 @@ function buildRelevanceMessages(
         {
           type: "text" as const,
           text: `
-            Task Title: ${taskTitle}
+            You are evaluating whether this image is valid proof that a user completed the task.
+            Task Title:
+            {taskTitle}
+
             Task Description:
-            ${taskDescription}
+            {taskDescription}
 
-            Evaluate how well this image satisfies the task.
+            Produce ONE overall score from 0–100 representing your confidence that this image should be accepted as valid evidence.
 
-            Return ONLY valid JSON in the following format:
+            Consider all of the following:
+
+            - How well the image demonstrates completion of the task.
+            - Whether the image appears to be a genuine photograph.
+            - Whether there are indicators of AI generation, fabrication, or synthetic editing.
+            - Whether the image provides convincing visual evidence.
+
+            Scoring guidance:
+
+            90-100
+            Clearly authentic and clearly demonstrates completion of the task.
+
+            70-89
+            Likely authentic and mostly demonstrates completion.
+
+            50-69
+            Some evidence exists, but there are meaningful uncertainties regarding relevance or authenticity.
+
+            20-49
+            Weak evidence. The image is substantially unrelated to the task or shows strong indicators of AI generation or fabrication.
+
+            0-19
+            The image is clearly unrelated, provides no evidence of completing the task, or is very likely AI-generated.
+
+            Important:
+
+            - Strong evidence of AI generation should substantially lower the score even if the image matches the task.
+            - Likewise, an authentic photo that is unrelated should receive a low score.
+            - If authenticity is uncertain, avoid assuming the image is AI-generated.
+            - Only assign scores above 90 when both authenticity and task relevance are very strong.
+
+            Return ONLY valid JSON:
 
             {
-              "score": <integer between 0 and 100>,
-              "sentence": "<one concise sentence explaining the score>"
+              "score": 0,
+              "sentence": ""
             }
 
-            Scoring guidelines:
-            - 90-100: Clearly completes the task.
-            - 70-89: Mostly completes the task with minor issues.
-            - 40-69: Some relation to the task but significant issues.
-            - 1-39: Weakly related or poor evidence.
-            - 0: Completely unrelated.
+            The sentence should be a single concise explanation (maximum 25 words) explaining the main reason for the score.
           `.trim(),
         },
       ],
@@ -112,7 +139,6 @@ async function callModelForRelevance(
   taskDescription: string,
   taskTitle: string,
 ) {
-  const started = performance.now();
   const completion = await openrouter.chat.completions.create({
     model,
     max_tokens: 200,
@@ -124,110 +150,31 @@ async function callModelForRelevance(
     ),
   });
 
-  const latencyMs = performance.now() - started;
-
   const rawResponse = completion.choices[0]?.message?.content ?? "{}";
 
-  const parsed = relevanceSchema.parse(extractJson(rawResponse));
+  const parsed = evaluationSchema.parse(extractJson(rawResponse));
 
-  return {
-    ...parsed,
-    latencyMs,
-    usage: {
-      promptTokens: completion.usage?.prompt_tokens,
-      completionTokens: completion.usage?.completion_tokens,
-      totalTokens: completion.usage?.total_tokens,
-    },
-    finishReason: completion.choices[0]?.finish_reason,
-    rawResponse,
-  };
+  return parsed;
 }
 
 export async function checkTaskRelevance(
   image: File,
   taskDescription: string,
   taskTitle: string,
-) {
+): Promise<{ score: number; sentence: string }> {
   const buf = await image.arrayBuffer();
   const base64 = Buffer.from(buf).toString("base64");
   const mediaType = image.type;
 
-  return callModelForRelevance(
+  const result = await callModelForRelevance(
     Bun.env.OPENROUTER_MODEL,
     base64,
     mediaType,
     taskDescription,
     taskTitle,
   );
-}
 
-export async function checkTaskRelevanceAcrossModels(
-  submissionId: string,
-  image: File,
-  taskDescription: string,
-  taskTitle: string,
-) {
-  const runId = randomUUID();
-
-  const buf = await image.arrayBuffer();
-  const base64 = Buffer.from(buf).toString("base64");
-  const mediaType = image.type;
-
-  const perModelResults = new Map<string, ModelRelevanceResult>();
-
-  relevanceRes.set(submissionId, perModelResults);
-
-  for (const model of models) {
-    try {
-      const result = await callModelForRelevance(
-        model,
-        base64,
-        mediaType,
-        taskDescription,
-        taskTitle,
-      );
-
-      perModelResults.set(model, {
-        model,
-        success: true,
-
-        aiConfidence: result.score,
-        aiVerdict: result.score,
-        sentence: result.sentence,
-
-        latencyMs: result.latencyMs,
-
-        usage: result.usage,
-
-        finishReason: result.finishReason,
-
-        rawResponse: result.rawResponse,
-      });
-    } catch (err) {
-      const error = err instanceof Error ? err.message : String(err);
-
-      perModelResults.set(model, {
-        model,
-        success: false,
-        latencyMs: 0,
-        error,
-      });
-
-      console.error(`${model} failed`, err);
-    }
-  }
-
-  await appendBenchmarkRun({
-    id: runId,
-    timestamp: new Date().toISOString(),
-
-    taskTitle,
-    taskDescription,
-
-    results: [...perModelResults.values()],
-  });
-
-  return perModelResults;
+  return result;
 }
 
 function extractJson(text: string) {
@@ -248,3 +195,72 @@ function extractJson(text: string) {
 
   return JSON.parse(match[0]);
 }
+
+// export async function checkTaskRelevanceAcrossModels(
+//   submissionId: string,
+//   image: File,
+//   taskDescription: string,
+//   taskTitle: string,
+// ) {
+//   const runId = randomUUID();
+
+//   const buf = await image.arrayBuffer();
+//   const base64 = Buffer.from(buf).toString("base64");
+//   const mediaType = image.type;
+
+//   const perModelResults = new Map<string, ModelRelevanceResult>();
+
+//   relevanceRes.set(submissionId, perModelResults);
+
+//   for (const model of models) {
+//     try {
+//       const result = await callModelForRelevance(
+//         model,
+//         base64,
+//         mediaType,
+//         taskDescription,
+//         taskTitle,
+//       );
+
+//       perModelResults.set(model, {
+//         model,
+//         success: true,
+
+//         aiConfidence: result.score,
+//         aiVerdict: result.score,
+//         sentence: result.sentence,
+
+//         latencyMs: result.latencyMs,
+
+//         usage: result.usage,
+
+//         finishReason: result.finishReason,
+
+//         rawResponse: result.rawResponse,
+//       });
+//     } catch (err) {
+//       const error = err instanceof Error ? err.message : String(err);
+
+//       perModelResults.set(model, {
+//         model,
+//         success: false,
+//         latencyMs: 0,
+//         error,
+//       });
+
+//       console.error(`${model} failed`, err);
+//     }
+//   }
+
+//   await appendBenchmarkRun({
+//     id: runId,
+//     timestamp: new Date().toISOString(),
+
+//     taskTitle,
+//     taskDescription,
+
+//     results: [...perModelResults.values()],
+//   });
+
+//   return perModelResults;
+// }
