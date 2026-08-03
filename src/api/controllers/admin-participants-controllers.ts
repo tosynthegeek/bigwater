@@ -9,7 +9,7 @@ import {
   type User,
 } from "@/db/schema/rail2";
 import { db } from "@/db";
-import { and, eq, sql } from "drizzle-orm";
+import { and, eq, ilike, or, sql } from "drizzle-orm";
 import { format } from "date-fns";
 import { getBandForMonthlyTally } from "@/services/economy/bands";
 import { getTallyPeriod } from "@/services/economy/tally";
@@ -58,7 +58,11 @@ export async function getAllParticipants(c: Context) {
         .leftJoin(userStreaks, eq(userStreaks.userId, authUsers.id))
         .where(
           search
-            ? sql`${participantProfile.username} ILIKE ${`%${search}%`}`
+            ? or(
+                ilike(participantProfile.username, `%${search}%`),
+                ilike(rail1Users.walletAddress, `%${search}%`),
+                ilike(authUsers.email, `%${search}%`),
+              )
             : undefined,
         )
         .orderBy(sql`COALESCE(${sustainabilityScore.totalScore}, 0) DESC`)
