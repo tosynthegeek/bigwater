@@ -7,8 +7,8 @@ export const submissionEvaluationWorker =
   new Worker<SubmissionEvaluationJobData>(
     "submission-evaluation",
     async (job) => {
-      const { submissionId, imageUrl, taskDescription } = job.data;
-      await evaluateSubmission(submissionId, imageUrl, taskDescription);
+      const { submissionId, imageUrl, taskTitle, taskDescription } = job.data;
+      await evaluateSubmission(submissionId, imageUrl, taskDescription, taskTitle);
     },
     {
       connection: makeConnection(),

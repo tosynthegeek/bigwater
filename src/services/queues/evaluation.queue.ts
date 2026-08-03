@@ -14,5 +14,6 @@ export const submissionEvaluationQueue = new Queue("submission-evaluation", {
 export type SubmissionEvaluationJobData = {
   submissionId: string;
   imageUrl: string;
+  taskTitle: string;
   taskDescription: string;
 };

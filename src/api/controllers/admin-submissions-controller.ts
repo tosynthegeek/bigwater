@@ -6,6 +6,7 @@ import { participantProfile, submissions, tasks } from "@/db/schema/rail2";
 import { desc, eq } from "drizzle-orm";
 import { updateUserStreak } from "@/services/economy/streaks";
 import { rail1Users } from "@/db/schema/rail1";
+import { relevanceRes } from "@/services/ai/relevance";
 
 export async function reviewSubmission(c: Context) {
   const user = c.get("user");
@@ -165,6 +166,9 @@ export async function getReadyForReviewSubmissions(c: Context) {
       ...submission,
       taskId: submission.taskId ?? "custom",
       taskTitle: submission.taskId ? submission.taskTitle : "Custom",
+      modelRelevance: Array.from(
+        relevanceRes.get(submission.id)?.values() ?? [],
+      ),
     }));
 
     return c.json({ submissionsReadyForReview }, 200);

@@ -52,6 +52,7 @@ export async function submitProof(c: Context) {
       {
         submissionId: submission.id,
         imageUrl: submission.imageUrl,
+        taskTitle: task.title,
         taskDescription: task.description,
       },
       { jobId: submission.id },

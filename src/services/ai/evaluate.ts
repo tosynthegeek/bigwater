@@ -8,6 +8,7 @@ export async function evaluateSubmission(
   submissionId: string,
   imageUrl: string,
   taskDescription: string,
+  taskTitle: string,
 ) {
   const imageRes = await fetch(imageUrl);
   if (!imageRes.ok) {
@@ -22,7 +23,7 @@ export async function evaluateSubmission(
 
   const [aiGenResult, relevanceResult] = await Promise.allSettled([
     checkAiGenerated(file),
-    checkTaskRelevance(file, taskDescription),
+    checkTaskRelevance(file, taskDescription, taskTitle),
   ]);
 
   const authenticity =
