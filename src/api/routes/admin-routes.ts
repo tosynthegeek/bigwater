@@ -28,6 +28,7 @@ import {
   adminLogin,
   getAdmin,
   getAllAdmins,
+  getApprovedAndRejectedSubmissions,
   getPlatformOverview,
   revokeAdmin,
 } from "../controllers/admin-controllers";
@@ -50,6 +51,10 @@ AdminRouter.get("/submissions/custom", getCustomSubmissions);
 AdminRouter.delete("/submissions/:id", deleteSubmission);
 AdminRouter.get("/submissions/review", getReadyForReviewSubmissions);
 AdminRouter.patch("/submissions/:id/review", reviewSubmission);
+AdminRouter.get(
+  "/submissions/approved-rejected",
+  getApprovedAndRejectedSubmissions,
+);
 
 AdminRouter.get("/participants", getAllParticipants);
 AdminRouter.patch("/participants/:userId/flag", flagParticipant);

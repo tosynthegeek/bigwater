@@ -349,3 +349,27 @@ export async function getAdmin(c: Context) {
     return c.json({ error: "Internal server error" }, 500);
   }
 }
+
+export async function getApprovedAndRejectedSubmissions(c: Context) {
+  const user = c.get("user") as User;
+
+  if (!user || (user.role != "superadmin" && user.role != "admin")) {
+    return c.json({ error: "Unauthorized access" }, 401);
+  }
+
+  try {
+    const approvedAndRejectedSubmissions = await db
+      .select()
+      .from(submissions)
+      .where(inArray(submissions.status, ["approved", "rejected"]))
+      .orderBy(desc(submissions.createdAt));
+
+    return c.json({ submissions: approvedAndRejectedSubmissions }, 200);
+  } catch (error) {
+    console.error(
+      "AdminControllers.getApprovedAndRejectedSubmissions.error: ",
+      error,
+    );
+    return c.json({ error: "Internal server error" }, 500);
+  }
+}
