@@ -5,8 +5,10 @@ import {
   participantProfile,
   submissions,
   pointsLedger,
+  tasks,
   type User,
 } from "@/db/schema/rail2";
+import { rail1Users } from "@/db/schema/rail1";
 import { and, desc, eq, gte, inArray, or, sql } from "drizzle-orm";
 import { subDays } from "date-fns";
 import { addAdminBodySchema, revokeAdminSchema } from "@/zod/admin";
@@ -357,14 +359,52 @@ export async function getApprovedAndRejectedSubmissions(c: Context) {
     return c.json({ error: "Unauthorized access" }, 401);
   }
 
-  try {
-    const approvedAndRejectedSubmissions = await db
-      .select()
-      .from(submissions)
-      .where(inArray(submissions.status, ["approved", "rejected"]))
-      .orderBy(desc(submissions.createdAt));
+  const limit = Math.min(parseInt(c.req.query("limit") || "20"), 100);
+  const offset = parseInt(c.req.query("offset") || "0");
 
-    return c.json({ submissions: approvedAndRejectedSubmissions }, 200);
+  try {
+    const result = await db
+      .select({
+        id: submissions.id,
+        userId: submissions.userId,
+        taskId: submissions.taskId,
+        source: submissions.source,
+        status: submissions.status,
+        imageUrl: submissions.imageUrl,
+        basePoints: tasks.basePoints,
+        aiConfidence: submissions.aiConfidence,
+        aiVerdict: submissions.aiVerdict,
+        createdAt: submissions.createdAt,
+        updatedAt: submissions.updatedAt,
+
+        taskTitle: tasks.title,
+
+        username: participantProfile.username,
+        walletAddress: rail1Users.walletAddress,
+      })
+      .from(submissions)
+      .leftJoin(tasks, eq(submissions.taskId, tasks.id))
+      .leftJoin(
+        participantProfile,
+        eq(submissions.userId, participantProfile.userId),
+      )
+      .leftJoin(rail1Users, eq(rail1Users.id, participantProfile.rail1UserId))
+      .where(inArray(submissions.status, ["approved", "rejected"]))
+      .orderBy(desc(submissions.createdAt))
+      .limit(limit)
+      .offset(offset);
+
+    return c.json(
+      {
+        submissions: result,
+        pagination: {
+          limit,
+          offset,
+          hasMore: result.length === limit,
+        },
+      },
+      200,
+    );
   } catch (error) {
     console.error(
       "AdminControllers.getApprovedAndRejectedSubmissions.error: ",
