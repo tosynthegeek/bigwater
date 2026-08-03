@@ -50,14 +50,9 @@ export async function enforceSubmissionLimits(
 
   const totalSubmissionsCount = totalSubmissionsRes[0]?.totalSubmissions ?? 0;
 
-  const maxSubmissionsPerDay =
-    task?.isHighValue === true
-      ? limits.maxHighValuePerDay
-      : limits.maxSubmissionsPerDay;
-
-  if (totalSubmissionsCount >= maxSubmissionsPerDay) {
+  if (totalSubmissionsCount >= limits.maxSubmissionsPerDay) {
     throw new SubmissionRejectedError(
-      `You have reached the daily limit of ${maxSubmissionsPerDay} submissions.`,
+      `You have reached the daily limit of ${limits.maxSubmissionsPerDay} submissions.`,
       429,
     );
   }
@@ -81,7 +76,7 @@ export async function enforceSubmissionLimits(
 
     if (totalHighValue >= limits.maxHighValuePerDay) {
       throw new SubmissionRejectedError(
-        "You can only submit one high-value task per day.",
+        `You have reached the daily limit of ${limits.maxHighValuePerDay} high-value submission${limits.maxHighValuePerDay === 1 ? "" : "s"}.`,
         429,
       );
     }
