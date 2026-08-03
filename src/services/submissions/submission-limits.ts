@@ -3,13 +3,15 @@ import { SubmissionRejectedError } from "@/utils/errors";
 import { and, count, desc, eq, gte } from "drizzle-orm";
 import { db } from "@/db";
 import { submissions, tasks } from "@/db/schema/rail2";
+import { periodIndex, timeframes } from "../economy/config";
 
 export async function enforceSubmissionLimits(
   userId: string,
   task: { id: string; isHighValue: boolean },
 ) {
   const now = new Date();
-  const today = startOfDayUtc(now);
+  const currentDayIdx = periodIndex(now, timeframes.dayPeriodMs);
+  const periodStart = new Date(currentDayIdx * timeframes.dayPeriodMs);
 
   const limits = await db.query.submissionLimits.findFirst();
 
@@ -40,7 +42,10 @@ export async function enforceSubmissionLimits(
     })
     .from(submissions)
     .where(
-      and(eq(submissions.userId, userId), gte(submissions.createdAt, today)),
+      and(
+        eq(submissions.userId, userId),
+        gte(submissions.createdAt, periodStart),
+      ),
     );
 
   const totalSubmissionsCount = totalSubmissionsRes[0]?.totalSubmissions ?? 0;
@@ -67,7 +72,7 @@ export async function enforceSubmissionLimits(
       .where(
         and(
           eq(submissions.userId, userId),
-          gte(submissions.createdAt, today),
+          gte(submissions.createdAt, periodStart),
           eq(tasks.isHighValue, true),
         ),
       );
