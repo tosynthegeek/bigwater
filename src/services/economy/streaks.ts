@@ -1,6 +1,6 @@
 import { db } from "@/db";
-import { and, asc, gt, lt } from "drizzle-orm";
-import { userStreaks, streakBonuses } from "@/db/schema/rail2";
+import { and, asc, gt, gte, inArray, lt } from "drizzle-orm";
+import { userStreaks, streakBonuses, submissions } from "@/db/schema/rail2";
 import { eq, sql } from "drizzle-orm";
 import { periodIndex, timeframes } from "./config";
 
@@ -19,9 +19,12 @@ function diffInDays(a: Date, b: Date) {
   );
 }
 
-export async function updateUserStreak(tx: Tx, userId: string) {
-  const now = new Date();
-  const nowIdx = periodIndex(now, timeframes.dayPeriodMs);
+export async function updateUserStreak(
+  tx: Tx,
+  userId: string,
+  activityDate: Date,
+) {
+  const activityIdx = periodIndex(activityDate, timeframes.dayPeriodMs);
 
   const streak = await tx.query.userStreaks.findFirst({
     where: eq(userStreaks.userId, userId),
@@ -34,24 +37,32 @@ export async function updateUserStreak(tx: Tx, userId: string) {
         userId,
         currentStreak: 1,
         longestStreak: 1,
-        lastActivityDate: now,
+        lastActivityDate: activityDate,
       })
       .onConflictDoUpdate({
         target: userStreaks.userId,
         set: {
           currentStreak: 1,
           longestStreak: sql`GREATEST(${userStreaks.longestStreak}, 1)`,
-          lastActivityDate: now,
-          updatedAt: now,
+          lastActivityDate: activityDate,
+          updatedAt: new Date(),
         },
       });
     return;
   }
 
   const lastIdx = periodIndex(streak.lastActivityDate, timeframes.dayPeriodMs);
-  const diff = nowIdx - lastIdx;
+  const diff = activityIdx - lastIdx;
 
   if (diff === 0) {
+    return;
+  }
+
+  // An approval for a day before the currently-credited day. Can happen when
+  // an earlier submission's review resolves after a later one's (out-of-order
+  // approvals). The streak is already ahead of this day — never let a stale
+  // approval regress lastActivityDate.
+  if (diff < 0) {
     return;
   }
 
@@ -61,8 +72,8 @@ export async function updateUserStreak(tx: Tx, userId: string) {
       .set({
         currentStreak: sql`${userStreaks.currentStreak} + 1`,
         longestStreak: sql`GREATEST(${userStreaks.longestStreak}, ${userStreaks.currentStreak} + 1)`,
-        lastActivityDate: now,
-        updatedAt: now,
+        lastActivityDate: activityDate,
+        updatedAt: new Date(),
       })
       .where(eq(userStreaks.userId, userId));
 
@@ -74,8 +85,8 @@ export async function updateUserStreak(tx: Tx, userId: string) {
     .update(userStreaks)
     .set({
       currentStreak: 1,
-      lastActivityDate: now,
-      updatedAt: now,
+      lastActivityDate: activityDate,
+      updatedAt: new Date(),
     })
     .where(eq(userStreaks.userId, userId));
 }
@@ -105,16 +116,64 @@ export async function runStreakBreakSweep() {
   const cutoffIdx = periodIndex(now, timeframes.dayPeriodMs) - 1;
   const cutoff = new Date(cutoffIdx * timeframes.dayPeriodMs);
 
-  await db
-    .update(userStreaks)
-    .set({
-      currentStreak: 0,
-      updatedAt: now,
+  const candidates = await db
+    .select({
+      userId: userStreaks.userId,
+      lastActivityDate: userStreaks.lastActivityDate,
     })
+    .from(userStreaks)
     .where(
       and(
         lt(userStreaks.lastActivityDate, cutoff),
         gt(userStreaks.currentStreak, 0),
       ),
     );
+
+  if (candidates.length === 0) return;
+
+  // For each candidate, the "grace day" is the day right after their last
+  // credited activity. If a submission for that exact day is still pending
+  // or under review, its outcome could still keep the streak alive — don't
+  // break yet. If it's since been rejected (or never existed), it won't
+  // match this filter and the user falls through to being broken below.
+  const graced = new Set<string>();
+
+  await Promise.all(
+    candidates.map(async (candidate) => {
+      if (!candidate.lastActivityDate) return;
+
+      const lastIdx = periodIndex(
+        candidate.lastActivityDate,
+        timeframes.dayPeriodMs,
+      );
+
+      const graceStart = new Date((lastIdx + 1) * timeframes.dayPeriodMs);
+
+      const graceEnd = new Date((lastIdx + 2) * timeframes.dayPeriodMs);
+
+      const pendingSubmission = await db.query.submissions.findFirst({
+        where: and(
+          eq(submissions.userId, candidate.userId),
+          inArray(submissions.status, ["pending", "under_review"]),
+          gte(submissions.createdAt, graceStart),
+          lt(submissions.createdAt, graceEnd),
+        ),
+      });
+
+      if (pendingSubmission) {
+        graced.add(candidate.userId);
+      }
+    }),
+  );
+
+  const toBreak = candidates
+    .map((c) => c.userId)
+    .filter((userId) => !graced.has(userId));
+
+  if (toBreak.length === 0) return;
+
+  await db
+    .update(userStreaks)
+    .set({ currentStreak: 0, updatedAt: now })
+    .where(inArray(userStreaks.userId, toBreak));
 }

@@ -69,7 +69,7 @@ export async function reviewSubmission(c: Context) {
           submission.id,
           task.basePoints,
         );
-        await updateUserStreak(tx, submission.userId);
+        await updateUserStreak(tx, submission.userId, submission.createdAt);
       }
 
       const [updatedSubmission] = await tx
