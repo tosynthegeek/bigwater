@@ -44,6 +44,8 @@ const envSchema = z.object({
 
   OPENROUTER_API_KEY: z.string(),
   OPENROUTER_MODEL: z.string().default("qwen/qwen3.6-flash"),
+  SIGHTENGINE_USER: z.string(),
+  SIGHTENGINE_SECRET: z.string(),
 });
 
 export default function parseEnv() {

@@ -6,7 +6,7 @@ const openrouter = new OpenAI({
   baseURL: "https://openrouter.ai/api/v1",
 });
 
-const evaluationSchema = z.object({
+const relevanceSchema = z.object({
   score: z.number().min(0).max(100),
   sentence: z.string(),
 });
@@ -70,61 +70,32 @@ function buildRelevanceMessages(
       content: [
         {
           type: "image_url" as const,
-          image_url: {
-            url: `data:${mediaType};base64,${base64}`,
-          },
+          image_url: { url: `data:${mediaType};base64,${base64}` },
         },
         {
           type: "text" as const,
           text: `
-            You are evaluating whether this image is valid proof that a user completed the task.
-            Task Title:
-            {taskTitle}
-
+            Task Title: ${taskTitle}
             Task Description:
-            {taskDescription}
+            ${taskDescription}
 
-            Produce ONE overall score from 0–100 representing your confidence that this image should be accepted as valid evidence.
+            Evaluate how well this image demonstrates that the task above was completed.
+            Do not assess whether the image is AI-generated or authentic — that is
+            handled separately. Focus only on task relevance.
 
-            Consider all of the following:
-
-            - How well the image demonstrates completion of the task.
-            - Whether the image appears to be a genuine photograph.
-            - Whether there are indicators of AI generation, fabrication, or synthetic editing.
-            - Whether the image provides convincing visual evidence.
-
-            Scoring guidance:
-
-            90-100
-            Clearly authentic and clearly demonstrates completion of the task.
-
-            70-89
-            Likely authentic and mostly demonstrates completion.
-
-            50-69
-            Some evidence exists, but there are meaningful uncertainties regarding relevance or authenticity.
-
-            20-49
-            Weak evidence. The image is substantially unrelated to the task or shows strong indicators of AI generation or fabrication.
-
-            0-19
-            The image is clearly unrelated, provides no evidence of completing the task, or is very likely AI-generated.
-
-            Important:
-
-            - Strong evidence of AI generation should substantially lower the score even if the image matches the task.
-            - Likewise, an authentic photo that is unrelated should receive a low score.
-            - If authenticity is uncertain, avoid assuming the image is AI-generated.
-            - Only assign scores above 90 when both authenticity and task relevance are very strong.
-
-            Return ONLY valid JSON:
+            Return ONLY valid JSON, no markdown fences:
 
             {
-              "score": 0,
-              "sentence": ""
+              "score": <integer 0-100>,
+              "sentence": "<one concise sentence, max 25 words, explaining the score>"
             }
 
-            The sentence should be a single concise explanation (maximum 25 words) explaining the main reason for the score.
+            Scoring guidelines:
+            - 90-100: Clearly completes the task.
+            - 70-89: Mostly completes the task with minor issues.
+            - 40-69: Some relation to the task but significant issues.
+            - 1-39: Weakly related or poor evidence.
+            - 0: Completely unrelated.
           `.trim(),
         },
       ],
@@ -152,9 +123,7 @@ async function callModelForRelevance(
 
   const rawResponse = completion.choices[0]?.message?.content ?? "{}";
 
-  const parsed = evaluationSchema.parse(extractJson(rawResponse));
-
-  return parsed;
+  return relevanceSchema.parse(extractJson(rawResponse));
 }
 
 export async function checkTaskRelevance(
@@ -264,3 +233,25 @@ function extractJson(text: string) {
 
 //   return perModelResults;
 // }
+
+function combineRelevanceAndAuthenticity(
+  relevance: { score: number; sentence: string },
+  authenticity: { score: number; sentence: string },
+) {
+  const score = Math.round(
+    (relevance.score / 100) * (authenticity.score / 100) * 100,
+  );
+
+  let sentence: string;
+  if (authenticity.score < 50 && relevance.score < 50) {
+    sentence = `Image appears unrelated to the task and shows signs of being AI-generated: ${relevance.sentence} ${authenticity.sentence}`;
+  } else if (authenticity.score < 50) {
+    sentence = `Image may satisfy the task, but ${authenticity.sentence.charAt(0).toLowerCase()}${authenticity.sentence.slice(1)}`;
+  } else if (relevance.score < 50) {
+    sentence = `Image appears authentic, but ${relevance.sentence.charAt(0).toLowerCase()}${relevance.sentence.slice(1)}`;
+  } else {
+    sentence = `${relevance.sentence} ${authenticity.sentence}`;
+  }
+
+  return { score, sentence };
+}
