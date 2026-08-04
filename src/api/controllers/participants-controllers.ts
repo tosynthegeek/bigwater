@@ -50,6 +50,20 @@ export async function linkRailOne(c: Context) {
 
   try {
     const rail1UserId = await verifyRail1Token(rail1Token);
+
+    const [existingProfile] = await db
+      .select()
+      .from(rail1Users)
+      .where(eq(rail1Users.id, rail1UserId))
+      .limit(1);
+
+    if (!existingProfile) {
+      console.error(
+        `Controllers.participants-controllers.linkRailOne.error: Rail1 user not found for rail1UserId=${rail1UserId}`,
+      );
+      return c.json({ error: "Rail1 user not found" }, 404);
+    }
+
     const [updated] = await db
       .update(participantProfile)
       .set({ rail1UserId })
