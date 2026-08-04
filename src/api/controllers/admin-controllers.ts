@@ -12,7 +12,7 @@ import { rail1Users } from "@/db/schema/rail1";
 import { and, desc, eq, gte, inArray, or, sql } from "drizzle-orm";
 import { subDays } from "date-fns";
 import { addAdminBodySchema, revokeAdminSchema } from "@/zod/admin";
-import { email } from "zod";
+import { timeframes } from "@/services/economy/config";
 
 function pct(numerator: number, denominator: number) {
   return denominator > 0 ? Math.round((numerator / denominator) * 100) : 0;
@@ -21,18 +21,18 @@ function pct(numerator: number, denominator: number) {
 export async function getPlatformOverview(c: Context) {
   try {
     const now = new Date();
-    const oneWeekAgo = subDays(now, 7);
-    const twoWeeksAgo = subDays(now, 14);
-    const thirtyDaysAgo = subDays(now, 30);
 
-    // Raw `sql` template literals hand their interpolated values straight to
-    // the postgres driver's parameter binder, which (unlike Drizzle's own
-    // gte()/eq() helpers used below) doesn't run them through Drizzle's
-    // Date-aware type mapping — it expects a string/Buffer and throws
-    // ("Received an instance of Date") if handed a raw Date. Stringify once
-    // here rather than at each call site.
+    const weekMs = 7 * timeframes.dayPeriodMs;
+    const twoWeeksMs = 14 * timeframes.dayPeriodMs;
+    const monthMs = 30 * timeframes.dayPeriodMs;
+
+    const oneWeekAgo = new Date(now.getTime() - weekMs);
+    const twoWeeksAgo = new Date(now.getTime() - twoWeeksMs);
+    const thirtyDaysAgo = new Date(now.getTime() - monthMs);
+
     const oneWeekAgoIso = oneWeekAgo.toISOString();
     const twoWeeksAgoIso = twoWeeksAgo.toISOString();
+    const thirtyDaysAgoIso = thirtyDaysAgo.toISOString();
 
     const [memberStats, submissionStats, pendingReview, pointsStats] =
       await Promise.all([
