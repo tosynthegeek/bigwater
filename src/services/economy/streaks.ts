@@ -52,6 +52,13 @@ export async function updateUserStreak(
   }
 
   const lastIdx = periodIndex(streak.lastActivityDate, timeframes.dayPeriodMs);
+  console.log({
+    activityDate,
+    lastActivityDate: streak.lastActivityDate,
+    activityIdx,
+    lastIdx,
+    diff: activityIdx - lastIdx,
+  });
   const diff = activityIdx - lastIdx;
 
   if (diff === 0) {
