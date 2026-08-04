@@ -183,9 +183,11 @@ export async function adjustParticipantPoints(c: Context) {
     return c.json({ error: "reason is required for audit" }, 400);
   }
 
-  const targetMonth = month || format(new Date(), "yyyy-MM");
   const now = new Date();
-  const periodEnd = getTallyPeriod(now).end;
+  const currentPeriod = getTallyPeriod(now);
+
+  const targetMonth = month || currentPeriod.key;
+  const periodEnd = currentPeriod.end;
 
   try {
     await db.transaction(async (tx) => {
