@@ -85,7 +85,9 @@ export async function enforceSubmissionLimits(
 
 export async function getSubmissionLimitStatus(userId: string) {
   const now = new Date();
-  const today = startOfDayUtc(now);
+
+  const currentDayIdx = periodIndex(now, timeframes.dayPeriodMs);
+  const periodStart = new Date(currentDayIdx * timeframes.dayPeriodMs);
 
   const limits = await db.query.submissionLimits.findFirst();
 
@@ -118,7 +120,7 @@ export async function getSubmissionLimitStatus(userId: string) {
     })
     .from(submissions)
     .where(
-      and(eq(submissions.userId, userId), gte(submissions.createdAt, today)),
+      and(eq(submissions.userId, userId), gte(submissions.createdAt, periodStart)),
     );
 
   const totalSubmissionsCount = totalSubmissionsRes[0]?.totalSubmissions ?? 0;
@@ -132,7 +134,7 @@ export async function getSubmissionLimitStatus(userId: string) {
     .where(
       and(
         eq(submissions.userId, userId),
-        gte(submissions.createdAt, today),
+        gte(submissions.createdAt, periodStart),
         eq(tasks.isHighValue, true),
       ),
     );
