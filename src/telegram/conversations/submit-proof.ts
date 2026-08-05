@@ -5,7 +5,7 @@ import type { BotContext, BotConversation } from "@/telegram/bot";
 export async function submitProofConversation(
   conversation: BotConversation,
   ctx: BotContext,
-  taskIdOrCustom: string,
+  taskId: string,
 ) {
   const telegramUserId = ctx.from?.id.toString();
   if (!telegramUserId) return;
@@ -22,7 +22,7 @@ export async function submitProofConversation(
   }
 
   await ctx.reply(
-    taskIdOrCustom === "custom"
+    taskId === "custom"
       ? "Send a photo of what you did — an admin will review it."
       : "Send a photo as proof for that task.",
   );
@@ -35,11 +35,18 @@ export async function submitProofConversation(
     return;
   }
 
-  await conversation.external(() =>
-    createTelegramSubmission(photo.file_id, user.id, taskIdOrCustom),
-  );
+  try {
+    await conversation.external(() =>
+      createTelegramSubmission(photo.file_id, user.id, taskId),
+    );
 
-  await ctx.reply(
-    "Got your photo! Submission is queued for verification. You'll be notified once it's processed.",
-  );
+    await ctx.reply(
+      "Got your photo! Submission is queued for verification. You'll be notified once it's processed.",
+    );
+  } catch (error) {
+    console.error("Error creating submission:", error);
+    await ctx.reply(
+      "There was an error processing your submission. Please try again later.",
+    );
+  }
 }
