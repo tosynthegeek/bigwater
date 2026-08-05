@@ -1,5 +1,6 @@
 import { createSubmission } from "@/services/submissions/submissions";
 import { getTelegramPhotoFile } from "@/telegram/handlers/photo";
+import { submissionEvaluationQueue } from "../queues/evaluation.queue";
 
 export async function createTelegramSubmission(
   fileId: string,
@@ -7,6 +8,23 @@ export async function createTelegramSubmission(
   taskId: string,
 ) {
   const file = await getTelegramPhotoFile(fileId);
-  let sub = await createSubmission(userId, taskId, file, "telegram");
-  return sub;
+  let { submission, task } = await createSubmission(
+    userId,
+    taskId,
+    file,
+    "telegram",
+  );
+
+  await submissionEvaluationQueue.add(
+    "evaluate",
+    {
+      submissionId: submission.id,
+      imageUrl: submission.imageUrl,
+      taskTitle: task.title,
+      taskDescription: task.description,
+    },
+    { jobId: submission.id },
+  );
+
+  return submission;
 }
