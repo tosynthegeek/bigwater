@@ -7,5 +7,6 @@ export async function createTelegramSubmission(
   taskId: string,
 ) {
   const file = await getTelegramPhotoFile(fileId);
-  return createSubmission(userId, taskId, file, "telegram");
+  let sub = await createSubmission(userId, taskId, file, "telegram");
+  return sub;
 }
