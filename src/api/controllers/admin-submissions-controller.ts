@@ -7,6 +7,7 @@ import { desc, eq } from "drizzle-orm";
 import { updateUserStreak } from "@/services/economy/streaks";
 import { rail1Users } from "@/db/schema/rail1";
 import { relevanceRes } from "@/services/ai/relevance";
+import { submissionNotificationQueue } from "@/services/queues/notification.queue";
 
 export async function reviewSubmission(c: Context) {
   const user = c.get("user");
@@ -80,6 +81,21 @@ export async function reviewSubmission(c: Context) {
         })
         .where(eq(submissions.id, submission.id))
         .returning();
+
+      if (!updatedSubmission) {
+        throw new Error("Failed to update submission status");
+      }
+
+      await submissionNotificationQueue.add(
+        "notify",
+        {
+          submissionId: updatedSubmission.id,
+          userId: updatedSubmission.userId,
+          taskId: updatedSubmission.taskId,
+          status: updatedSubmission.status,
+        },
+        { jobId: `notify-${updatedSubmission.id}` },
+      );
 
       return updatedSubmission;
     });
