@@ -7,7 +7,7 @@ import { participantProfile } from "@/db/schema/rail2";
 import { db } from "@/db";
 import { eq } from "drizzle-orm";
 
-new Worker(
+export const notificationWorker = new Worker(
   "submission-notification",
   async (job) => {
     const { userId, taskId, status } = job.data;
@@ -34,3 +34,13 @@ new Worker(
   },
   { connection: makeConnection() },
 );
+
+notificationWorker.on("failed", (job, err) => {
+  console.error(`submission-notification failed job=${job?.id}:`, err);
+});
+notificationWorker.on("completed", (job) => {
+  console.log(`submission-notification completed job=${job?.id}`);
+});
+notificationWorker.on("error", (err) => {
+  console.error("submission-notification worker error", err);
+});
