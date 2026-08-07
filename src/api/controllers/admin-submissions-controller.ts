@@ -89,7 +89,6 @@ export async function reviewSubmission(c: Context) {
       await submissionNotificationQueue.add(
         "notify",
         {
-          submissionId: updatedSubmission.id,
           userId: updatedSubmission.userId,
           taskId: updatedSubmission.taskId,
           status: updatedSubmission.status,
