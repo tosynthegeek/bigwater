@@ -31,6 +31,7 @@ import {
   getApprovedAndRejectedSubmissions,
   getPlatformOverview,
   revokeAdmin,
+  sendTelegramBroadcast,
 } from "../controllers/admin-controllers";
 
 const AdminRouter = new Hono();
@@ -65,4 +66,5 @@ AdminRouter.post("/add", addAdmin);
 AdminRouter.post("/revoke", revokeAdmin);
 AdminRouter.get("/profile", getAdmin);
 
+AdminRouter.post("/telegram/broadcast", sendTelegramBroadcast);
 export default AdminRouter;

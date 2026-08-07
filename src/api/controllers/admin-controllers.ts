@@ -12,6 +12,10 @@ import { rail1Users } from "@/db/schema/rail1";
 import { and, desc, eq, gte, inArray, or, sql } from "drizzle-orm";
 import { addAdminBodySchema, revokeAdminSchema } from "@/zod/admin";
 import { timeframes } from "@/services/economy/config";
+import { mkdir, writeFile } from "node:fs/promises";
+import { join } from "node:path";
+import { randomUUID } from "node:crypto";
+import { telegramMarketingQueue } from "@/services/queues/telegram-marketing.queue";
 
 function pct(numerator: number, denominator: number) {
   return denominator > 0 ? Math.round((numerator / denominator) * 100) : 0;
@@ -411,4 +415,123 @@ export async function getApprovedAndRejectedSubmissions(c: Context) {
     );
     return c.json({ error: "Internal server error" }, 500);
   }
+}
+
+export async function sendTelegramBroadcast(c: Context) {
+  const user = c.get("user");
+
+  if (!user || typeof user.id !== "string") {
+    return c.json(
+      {
+        error: "Unauthorized",
+      },
+      401,
+    );
+  }
+
+  if (user.role !== "admin") {
+    return c.json(
+      {
+        error: "Forbidden",
+      },
+      403,
+    );
+  }
+
+  const body = await c.req.formData();
+
+  const message = body.get("message");
+  const file = body.get("file");
+
+  if (!message || typeof message !== "string") {
+    return c.json(
+      {
+        error: "Message is required",
+      },
+      400,
+    );
+  }
+
+  const trimmedMessage = message.trim();
+
+  if (!trimmedMessage) {
+    return c.json(
+      {
+        error: "Message cannot be empty",
+      },
+      400,
+    );
+  }
+
+  if (trimmedMessage.length > 1024) {
+    return c.json(
+      {
+        error:
+          "Message is too long. Telegram photo captions are limited to 1024 characters.",
+      },
+      400,
+    );
+  }
+
+  let imagePath: string | undefined;
+
+  if (file) {
+    if (!(file instanceof File)) {
+      return c.json(
+        {
+          error: "Invalid image upload.",
+        },
+        400,
+      );
+    }
+
+    if (!file.type.startsWith("image/")) {
+      return c.json(
+        {
+          error: "Uploaded file must be an image.",
+        },
+        400,
+      );
+    }
+
+    // 10 MB limit.
+    const maxFileSize = 10 * 1024 * 1024;
+
+    if (file.size > maxFileSize) {
+      return c.json(
+        {
+          error: "Image must be smaller than 10 MB.",
+        },
+        400,
+      );
+    }
+
+    const uploadDirectory = "/tmp/telegram-marketing";
+
+    await mkdir(uploadDirectory, {
+      recursive: true,
+    });
+
+    const extension = file.name.split(".").pop()?.toLowerCase() || "jpg";
+
+    imagePath = join(uploadDirectory, `${randomUUID()}.${extension}`);
+
+    const buffer = Buffer.from(await file.arrayBuffer());
+
+    await writeFile(imagePath, buffer);
+  }
+
+  const job = await telegramMarketingQueue.add("broadcast", {
+    message: trimmedMessage,
+    imagePath,
+    initiatedBy: user.id,
+  });
+
+  return c.json(
+    {
+      message: "Telegram broadcast queued successfully",
+      jobId: job.id,
+    },
+    202,
+  );
 }

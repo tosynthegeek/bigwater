@@ -4,6 +4,7 @@ import { streakSweepWorker } from "../workers/streak.workers";
 import { notificationWorker } from "../workers/notification.worker";
 import { scheduleBankingSweep } from "./banking.queue";
 import { scheduleStreakSweep } from "./streak.queue";
+import { telegramMarketingWorker } from "../workers/telegram-marketing.worker";
 
 export async function startQueues() {
   await scheduleBankingSweep();
@@ -19,5 +20,6 @@ export async function stopQueues() {
     streakSweepWorker.close(),
     submissionEvaluationWorker.close(),
     notificationWorker.close(),
+    telegramMarketingWorker.close(),
   ]);
 }
