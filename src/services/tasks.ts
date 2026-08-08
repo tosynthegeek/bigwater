@@ -1,6 +1,7 @@
 import { desc, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { tasks } from "@/db/schema/rail2";
+import { taskQueue } from "./queues/tasks.queue";
 
 export type ActiveTask = {
   id: string;
@@ -45,6 +46,15 @@ export async function createtask(params: CreateTaskParams) {
       active: params.active ?? true,
     })
     .returning();
+
+  if (!task) {
+    throw new Error("Failed to create task");
+  }
+
+  taskQueue.add("task-notification", {
+    taskTitle: task.title,
+    taskDescription: task.description,
+  });
 
   return task;
 }
