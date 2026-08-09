@@ -14,3 +14,9 @@ export const streakSweepWorker = new Worker<SweepJobData>(
 streakSweepWorker.on("failed", (job, err) => {
   console.error(`streak-sweep failed job=${job?.id}:`, err);
 });
+streakSweepWorker.on("completed", (job) => {
+  console.log(`streak-sweep completed job=${job?.id}`);
+});
+streakSweepWorker.on("error", (err) => {
+  console.error("streak-sweep worker error", err);
+});
