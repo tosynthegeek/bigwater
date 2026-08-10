@@ -2,8 +2,13 @@ import { processApprovedSubmission } from "@/services/economy/score";
 import type { Context } from "hono";
 
 import { db } from "@/db";
-import { participantProfile, submissions, tasks } from "@/db/schema/rail2";
-import { desc, eq } from "drizzle-orm";
+import {
+  participantProfile,
+  submissions,
+  tasks,
+  type User,
+} from "@/db/schema/rail2";
+import { desc, eq, inArray } from "drizzle-orm";
 import { updateUserStreak } from "@/services/economy/streaks";
 import { rail1Users } from "@/db/schema/rail1";
 import { relevanceRes } from "@/services/ai/relevance";
@@ -193,6 +198,68 @@ export async function getReadyForReviewSubmissions(c: Context) {
       error,
     );
 
+    return c.json({ error: "Internal server error" }, 500);
+  }
+}
+
+export async function getApprovedAndRejectedSubmissions(c: Context) {
+  const user = c.get("user") as User;
+
+  if (!user || (user.role != "superadmin" && user.role != "admin")) {
+    return c.json({ error: "Unauthorized access" }, 401);
+  }
+
+  const limit = Math.min(parseInt(c.req.query("limit") || "20"), 100);
+  const offset = parseInt(c.req.query("offset") || "0");
+
+  try {
+    const result = await db
+      .select({
+        id: submissions.id,
+        userId: submissions.userId,
+        taskId: submissions.taskId,
+        source: submissions.source,
+        status: submissions.status,
+        imageUrl: submissions.imageUrl,
+        basePoints: tasks.basePoints,
+        aiConfidence: submissions.aiConfidence,
+        aiVerdict: submissions.aiVerdict,
+        createdAt: submissions.createdAt,
+        updatedAt: submissions.updatedAt,
+
+        taskTitle: tasks.title,
+
+        username: participantProfile.username,
+        walletAddress: rail1Users.walletAddress,
+      })
+      .from(submissions)
+      .leftJoin(tasks, eq(submissions.taskId, tasks.id))
+      .leftJoin(
+        participantProfile,
+        eq(submissions.userId, participantProfile.userId),
+      )
+      .leftJoin(rail1Users, eq(rail1Users.id, participantProfile.rail1UserId))
+      .where(inArray(submissions.status, ["approved", "rejected"]))
+      .orderBy(desc(submissions.createdAt))
+      .limit(limit)
+      .offset(offset);
+
+    return c.json(
+      {
+        submissions: result,
+        pagination: {
+          limit,
+          offset,
+          hasMore: result.length === limit,
+        },
+      },
+      200,
+    );
+  } catch (error) {
+    console.error(
+      "AdminControllers.getApprovedAndRejectedSubmissions.error: ",
+      error,
+    );
     return c.json({ error: "Internal server error" }, 500);
   }
 }

@@ -21,8 +21,26 @@ const identifierSchema = z.union([
   })),
 ]);
 
-export const addAdminBodySchema = z.object({
-  identifier: identifierSchema,
+export const addAdminBodySchema = z.discriminatedUnion("method", [
+  z.object({
+    method: z.literal("privy"),
+    identifier: identifierSchema,
+  }),
+  z.object({
+    method: z.literal("password"),
+    email: z.email(),
+    username: z.string().min(3).max(32),
+    password: z.string().min(12),
+  }),
+]);
+
+export const updateOwnPasswordSchema = z.object({
+  currentPassword: z.string().min(1),
+  newPassword: z.string().min(12),
+});
+
+export const resetAdminPasswordSchema = z.object({
+  newPassword: z.string().min(12),
 });
 
 export const revokeAdminSchema = z.object({

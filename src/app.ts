@@ -17,7 +17,7 @@ import {
 import ApiRouter from "@/api/routes/api-routes";
 import AdminRouter from "./api/routes/admin-routes";
 import InternalRouter from "./api/routes/internal-routes";
-import { adminLogin } from "./api/controllers/admin-controllers";
+import { adminLogin } from "./api/controllers/admin/admin-controllers";
 
 const app = new Hono();
 
