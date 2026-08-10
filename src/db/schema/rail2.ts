@@ -32,10 +32,12 @@ export const submissionSource = pgEnum("submission_source", [
 
 export const authUsers = pgTable("auth_accounts", {
   id: varchar("id").primaryKey().$defaultFn(nanoid),
-  privyDid: text("privy_did").notNull().unique(),
+  privyDid: text("privy_did").unique(),
   role: userRole("role").notNull().default("user"),
   status: text("status").notNull().default("active"),
   email: text("email").unique(),
+  username: text("username").unique(),
+  passwordHash: text("password_hash"),
   walletAddress: text("wallet_address").unique(),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()

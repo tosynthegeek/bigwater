@@ -6,35 +6,41 @@ import {
   deactivateTask,
   getAllTasks,
   updateTask,
-} from "@/api/controllers/admin-tasks-controllers";
+} from "@/api/controllers/admin/admin-tasks-controllers";
 import {
   reviewSubmission,
   deleteSubmission,
   getReadyForReviewSubmissions,
-} from "../controllers/admin-submissions-controller";
+  getApprovedAndRejectedSubmissions,
+} from "../controllers/admin/admin-submissions-controller";
 import {
   getBands,
   getSubmissionLimits,
   updateBand,
   updateSubmissionLimits,
-} from "../controllers/admin-config-controllers";
+} from "../controllers/admin/admin-config-controllers";
 import {
   adjustParticipantPoints,
   flagParticipant,
   getAllParticipants,
-} from "../controllers/admin-participants-controllers";
+} from "../controllers/admin/admin-participants-controllers";
 import {
   addAdmin,
-  adminLogin,
   getAdmin,
   getAllAdmins,
-  getApprovedAndRejectedSubmissions,
-  getPlatformOverview,
+  resetAdminPassword,
   revokeAdmin,
+  updateOwnPassword,
+} from "../controllers/admin/admin-controllers";
+import {
+  getPlatformOverview,
   sendTelegramBroadcast,
-} from "../controllers/admin-controllers";
+} from "../controllers/admin/admin-services-controllers";
 
 const AdminRouter = new Hono();
+
+AdminRouter.patch("/password", updateOwnPassword);
+AdminRouter.patch("/admins/:adminUserId/password", resetAdminPassword);
 
 AdminRouter.get("/tasks", getAllTasks);
 AdminRouter.post("/tasks", createTask);
