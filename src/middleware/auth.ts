@@ -4,7 +4,12 @@ import {
   getOrcreateAdminByPrivyDid,
   getOrCreateUserByPrivyDid,
 } from "@/services/identity";
-import { type User } from "@/db/schema/rail2";
+import { authUsers, type User } from "@/db/schema/rail2";
+import { eq } from "drizzle-orm";
+import { verify } from "hono/jwt";
+import redisClient from "@/redis";
+import { db } from "@/db";
+import { JWT_ALGORITHM } from "./rail1-jwt";
 
 type Env = {
   Variables: {
@@ -130,5 +135,43 @@ export const requireBotSecret = createMiddleware(async (c, next) => {
   if (!secret || secret !== Bun.env.TELEGRAM_BOT_SHARED_SECRET) {
     return c.json({ error: "Invalid bot secret" }, 401);
   }
+  return next();
+});
+
+export const adminSessionAuth = createMiddleware(async (c, next) => {
+  const authHeader = c.req.header("authorization");
+  if (authHeader?.startsWith("Bearer ")) {
+    return adminLoginAuth(c, next);
+  }
+
+  const cookie = c.req.header("cookie") ?? "";
+  const token = cookie.match(/admin_session=([^;]+)/)?.[1];
+  if (!token) {
+    c.set("user", null);
+    return next();
+  }
+
+  try {
+    const payload = await verify(token, Bun.env.ADMIN_SESSION_SECRET, JWT_ALGORITHM);
+    const revoked = await redisClient.get(`revoked:${payload.jti}`);
+    if (revoked) {
+      c.set("user", null);
+      return next();
+    }
+
+    const admin = await db.query.authUsers.findFirst({
+      where: eq(authUsers.id, payload.sub as string),
+    });
+
+    if (!admin || admin.status !== "active") {
+      c.set("user", null);
+      return next();
+    }
+
+    c.set("user", admin);
+  } catch {
+    c.set("user", null);
+  }
+
   return next();
 });

@@ -1,11 +1,11 @@
 import { jwtVerify } from "jose";
 
 const RAIL1_JWT_SECRET = new TextEncoder().encode(Bun.env.RAIL1_JWT_SECRET);
-const RAIL1_JWT_ALGORITHM = "HS256";
+export const JWT_ALGORITHM = "HS256";
 
 export async function verifyRail1Token(token: string): Promise<string> {
   const { payload } = await jwtVerify(token, RAIL1_JWT_SECRET, {
-    algorithms: [RAIL1_JWT_ALGORITHM],
+    algorithms: [JWT_ALGORITHM],
   });
 
   // Mirror rail1's own check: a member token must never carry `scope`.

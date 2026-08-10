@@ -12,7 +12,6 @@ import {
   requireAuth,
   requireAdmin,
   requireServiceAuth,
-  adminLoginAuth,
 } from "@/middleware/auth";
 
 import ApiRouter from "@/api/routes/api-routes";
@@ -95,7 +94,7 @@ app.get("/uploads/:filename", async (c) => {
   return new Response(file);
 });
 
-app.use("/api/admin/login", adminLoginAuth, adminLogin);
+app.use("/api/admin/login", adminLogin);
 app.use("/api/*", privyAuth);
 app.use("/api/*", requireAuth);
 

@@ -16,6 +16,15 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { randomUUID } from "node:crypto";
 import { telegramMarketingQueue } from "@/services/queues/telegram-marketing.queue";
+import { nanoid } from "@/utils/nanoid";
+import { getOrcreateAdminByPrivyDid } from "@/services/identity";
+import { privy } from "@/privy";
+import { checkRateLimit } from "@/utils/time";
+import { sign } from "hono/jwt";
+import { JWT_ALGORITHM } from "@/middleware/rail1-jwt";
+
+const SESSION_TTL_SECONDS = 60 * 60 * 8;
+const SECRET = Bun.env.ADMIN_SESSION_SECRET;
 
 function pct(numerator: number, denominator: number) {
   return denominator > 0 ? Math.round((numerator / denominator) * 100) : 0;
@@ -182,36 +191,18 @@ export async function getPlatformOverview(c: Context) {
 }
 
 export async function adminLogin(c: Context) {
-  const user = c.get("user") as User;
+  const authHeader = c.req.header("authorization");
 
-  if (!user || (user.role != "superadmin" && user.role != "admin")) {
-    return c.json({ error: "Unauthorized access" }, 401);
+  if (authHeader?.startsWith("Bearer ")) {
+    return handlePrivyLogin(c, authHeader.slice(7));
   }
 
-  try {
-    const [admin] = await db
-      .select({
-        id: authUsers.id,
-        privyDid: authUsers.privyDid,
-        role: authUsers.role,
-        status: authUsers.status,
-        email: authUsers.email,
-        wallet: authUsers.walletAddress,
-        createdAt: authUsers.createdAt,
-        updatedAt: authUsers.updatedAt,
-      })
-      .from(authUsers)
-      .where(eq(authUsers.id, user.id));
-
-    if (!admin || (admin.role !== "admin" && admin.role !== "superadmin")) {
-      return c.json({ error: "Unauthorized" }, 403);
-    }
-
-    return c.json({ admin }, 200);
-  } catch (error) {
-    console.error("AdminControllers.adminLogin.error: ", error);
-    return c.json({ error: "Internal server error" }, 500);
+  const body = await c.req.json().catch(() => null);
+  if (body?.identifier && body?.password) {
+    return handlePasswordLogin(c, body.identifier, body.password);
   }
+
+  return c.json({ error: "No valid credentials provided" }, 400);
 }
 
 export async function getAllAdmins(c: Context) {
@@ -533,5 +524,82 @@ export async function sendTelegramBroadcast(c: Context) {
       jobId: job.id,
     },
     202,
+  );
+}
+
+async function handlePrivyLogin(c: Context, token: string) {
+  let admin;
+  try {
+    const claims = await privy.utils().auth().verifyAccessToken(token);
+    admin = await getOrcreateAdminByPrivyDid(claims.user_id);
+  } catch (err) {
+    console.error("[adminLogin:privy]", (err as Error)?.message);
+    return c.json({ error: "Unauthorized" }, 401);
+  }
+
+  if (!admin || (admin.role !== "admin" && admin.role !== "superadmin")) {
+    return c.json({ error: "Unauthorized" }, 403);
+  }
+
+  return issueAdminSession(c, admin);
+}
+
+async function handlePasswordLogin(
+  c: Context,
+  identifier: string,
+  password: string,
+) {
+  try {
+    await checkRateLimit(`admin-login:${identifier}`);
+  } catch {
+    return c.json({ error: "Too many attempts, try again later" }, 429);
+  }
+
+  const admin = await db.query.authUsers.findFirst({
+    where: or(
+      eq(authUsers.email, identifier),
+      eq(authUsers.username, identifier),
+    ),
+  });
+
+  if (!admin || !admin.passwordHash || admin.status !== "active") {
+    return c.json({ error: "Invalid credentials" }, 401);
+  }
+  if (admin.role !== "admin" && admin.role !== "superadmin") {
+    return c.json({ error: "Invalid credentials" }, 401);
+  }
+  if (!(await Bun.password.verify(password, admin.passwordHash))) {
+    return c.json({ error: "Invalid credentials" }, 401);
+  }
+
+  return issueAdminSession(c, admin);
+}
+
+async function issueAdminSession(
+  c: Context,
+  admin: typeof authUsers.$inferSelect,
+) {
+  const jti = nanoid();
+  const now = Math.floor(Date.now() / 1000);
+  const token = await sign(
+    {
+      sub: admin.id,
+      role: admin.role,
+      jti,
+      iat: now,
+      exp: now + SESSION_TTL_SECONDS,
+    },
+    SECRET,
+    JWT_ALGORITHM,
+  );
+
+  c.header(
+    "Set-Cookie",
+    `admin_session=${token}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=${SESSION_TTL_SECONDS}`,
+  );
+
+  return c.json(
+    { admin: { id: admin.id, role: admin.role, email: admin.email } },
+    200,
   );
 }
