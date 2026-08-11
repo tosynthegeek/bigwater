@@ -1,6 +1,5 @@
-import { startOfDayUtc } from "@/utils/time";
 import { SubmissionRejectedError } from "@/utils/errors";
-import { and, count, desc, eq, gte } from "drizzle-orm";
+import { and, count, desc, eq, gte, lt } from "drizzle-orm";
 import { db } from "@/db";
 import { submissions, tasks } from "@/db/schema/rail2";
 import { periodIndex, timeframes } from "../economy/config";
@@ -12,11 +11,28 @@ export async function enforceSubmissionLimits(
   const now = new Date();
   const currentDayIdx = periodIndex(now, timeframes.dayPeriodMs);
   const periodStart = new Date(currentDayIdx * timeframes.dayPeriodMs);
+  const periodEnd = new Date((currentDayIdx + 1) * timeframes.dayPeriodMs);
 
   const limits = await db.query.submissionLimits.findFirst();
 
   if (!limits) {
     throw new Error("Submission limits not configured");
+  }
+
+  const existingTaskSubmission = await db.query.submissions.findFirst({
+    where: and(
+      eq(submissions.userId, userId),
+      eq(submissions.taskId, task.id),
+      gte(submissions.createdAt, periodStart),
+      lt(submissions.createdAt, periodEnd),
+    ),
+  });
+
+  if (existingTaskSubmission) {
+    throw new SubmissionRejectedError(
+      "You have already submitted this task today. Please choose a different task.",
+      429,
+    );
   }
 
   const latestSubmission = await db.query.submissions.findFirst({
@@ -45,6 +61,7 @@ export async function enforceSubmissionLimits(
       and(
         eq(submissions.userId, userId),
         gte(submissions.createdAt, periodStart),
+        lt(submissions.createdAt, periodEnd),
       ),
     );
 
@@ -57,7 +74,7 @@ export async function enforceSubmissionLimits(
     );
   }
 
-  if (task?.isHighValue) {
+  if (task.isHighValue) {
     const result = await db
       .select({
         totalHighValue: count(),
@@ -68,6 +85,7 @@ export async function enforceSubmissionLimits(
         and(
           eq(submissions.userId, userId),
           gte(submissions.createdAt, periodStart),
+          lt(submissions.createdAt, periodEnd),
           eq(tasks.isHighValue, true),
         ),
       );
@@ -87,7 +105,10 @@ export async function getSubmissionLimitStatus(userId: string) {
   const now = new Date();
 
   const currentDayIdx = periodIndex(now, timeframes.dayPeriodMs);
+
   const periodStart = new Date(currentDayIdx * timeframes.dayPeriodMs);
+
+  const periodEnd = new Date((currentDayIdx + 1) * timeframes.dayPeriodMs);
 
   const limits = await db.query.submissionLimits.findFirst();
 
@@ -95,10 +116,49 @@ export async function getSubmissionLimitStatus(userId: string) {
     throw new Error("Submission limits not configured");
   }
 
-  const latestSubmission = await db.query.submissions.findFirst({
-    where: eq(submissions.userId, userId),
-    orderBy: desc(submissions.createdAt),
-  });
+  const [
+    latestSubmission,
+    todaySubmissions,
+    todayHighValueSubmissions,
+    activeTasks,
+  ] = await Promise.all([
+    db.query.submissions.findFirst({
+      where: eq(submissions.userId, userId),
+      orderBy: desc(submissions.createdAt),
+    }),
+
+    db
+      .select({
+        taskId: submissions.taskId,
+      })
+      .from(submissions)
+      .where(
+        and(
+          eq(submissions.userId, userId),
+          gte(submissions.createdAt, periodStart),
+          lt(submissions.createdAt, periodEnd),
+        ),
+      ),
+
+    db
+      .select({
+        totalHighValue: count(),
+      })
+      .from(submissions)
+      .innerJoin(tasks, eq(submissions.taskId, tasks.id))
+      .where(
+        and(
+          eq(submissions.userId, userId),
+          gte(submissions.createdAt, periodStart),
+          lt(submissions.createdAt, periodEnd),
+          eq(tasks.isHighValue, true),
+        ),
+      ),
+
+    db.query.tasks.findMany({
+      where: eq(tasks.active, true),
+    }),
+  ]);
 
   const cooldownMs = limits.cooldownHours;
 
@@ -114,44 +174,46 @@ export async function getSubmissionLimitStatus(userId: string) {
     }
   }
 
-  const totalSubmissionsRes = await db
-    .select({
-      totalSubmissions: count(),
-    })
-    .from(submissions)
-    .where(
-      and(eq(submissions.userId, userId), gte(submissions.createdAt, periodStart)),
-    );
+  const submissionsUsed = todaySubmissions.length;
+  const highValueUsed = todayHighValueSubmissions[0]?.totalHighValue ?? 0;
 
-  const totalSubmissionsCount = totalSubmissionsRes[0]?.totalSubmissions ?? 0;
+  const submittedTaskIds = new Set(
+    todaySubmissions.map((submission) => submission.taskId),
+  );
 
-  const totalHighValueRes = await db
-    .select({
-      totalHighValue: count(),
-    })
-    .from(submissions)
-    .innerJoin(tasks, eq(submissions.taskId, tasks.id))
-    .where(
-      and(
-        eq(submissions.userId, userId),
-        gte(submissions.createdAt, periodStart),
-        eq(tasks.isHighValue, true),
-      ),
-    );
+  const dailyLimitReached = submissionsUsed >= limits.maxSubmissionsPerDay;
 
-  const totalHighValueCount = totalHighValueRes[0]?.totalHighValue ?? 0;
+  const cooldownActive = remainingSeconds > 0;
+
+  const availableTasks =
+    !dailyLimitReached && !cooldownActive
+      ? activeTasks.filter((task) => {
+          if (submittedTaskIds.has(task.id)) {
+            return false;
+          }
+
+          if (task.isHighValue && highValueUsed >= limits.maxHighValuePerDay) {
+            return false;
+          }
+
+          return true;
+        })
+      : [];
 
   return {
     cooldown: {
-      active: remainingSeconds > 0,
+      active: cooldownActive,
       remainingSeconds,
       nextSubmissionAt,
     },
+
     today: {
-      submissionsUsed: totalSubmissionsCount,
+      submissionsUsed,
       submissionsLimit: limits.maxSubmissionsPerDay,
-      highValueUsed: totalHighValueCount,
+      highValueUsed,
       highValueLimit: limits.maxHighValuePerDay,
     },
+
+    availableTasks,
   };
 }
