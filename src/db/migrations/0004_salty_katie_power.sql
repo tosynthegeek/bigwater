@@ -1,0 +1,1 @@
+ALTER TABLE "participant_profile" ALTER COLUMN "rail1_user_id" SET NOT NULL;

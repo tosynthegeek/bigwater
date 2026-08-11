@@ -53,7 +53,7 @@ export const participantProfile = pgTable("participant_profile", {
     .notNull()
     .unique()
     .references(() => authUsers.id, { onDelete: "cascade" }),
-  rail1UserId: uuid("rail1_user_id").unique(),
+  rail1UserId: uuid("rail1_user_id").unique().notNull(),
   username: text("username"),
   telegramId: text("telegram_id").unique(),
   isMember: boolean("is_member").notNull().default(false),
