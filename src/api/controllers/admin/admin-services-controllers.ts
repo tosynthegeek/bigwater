@@ -35,8 +35,8 @@ export async function getPlatformOverview(c: Context) {
     const thirtyDaysAgoIso = thirtyDaysAgo.toISOString();
 
     const [
-      rail2MemberStats,
-      rail1MemberStats,
+      rail1Stats,
+      rail2Stats,
       submissionStats,
       pendingReview,
       pointsStats,
@@ -45,19 +45,20 @@ export async function getPlatformOverview(c: Context) {
         .select({
           totalMembers: sql<number>`COUNT(*)`.mapWith(Number),
           newThisWeek: sql<number>`
-            COUNT(CASE WHEN ${authUsers.createdAt} >= ${oneWeekAgoIso} THEN 1 END)
-          `.mapWith(Number),
-        })
-        .from(participantProfile)
-        .innerJoin(authUsers, eq(authUsers.id, participantProfile.userId)),
-      db
-        .select({
-          totalMembers: sql<number>`COUNT(*)`.mapWith(Number),
-          newThisWeek: sql<number>`
-          COUNT(CASE WHEN ${rail1Users.createdAt} >= ${oneWeekAgoIso} THEN 1 END)
-        `.mapWith(Number),
+        COUNT(CASE WHEN ${rail1Users.createdAt} >= ${oneWeekAgoIso} THEN 1 END)
+      `.mapWith(Number),
         })
         .from(rail1Users),
+
+      // rail2 engagement — for context/breakdown, not part of totalMembers.
+      db
+        .select({
+          totalRail2Members: sql<number>`COUNT(*)`.mapWith(Number),
+          newThisWeek: sql<number>`
+        COUNT(CASE WHEN ${participantProfile.createdAt} >= ${oneWeekAgoIso} THEN 1 END)
+      `.mapWith(Number),
+        })
+        .from(participantProfile),
 
       db
         .select({
@@ -136,8 +137,8 @@ export async function getPlatformOverview(c: Context) {
         .from(pointsLedger),
     ]);
 
-    const r2 = rail2MemberStats[0];
-    const r1 = rail1MemberStats[0];
+    const r1 = rail1Stats[0];
+    const r2 = rail2Stats[0];
     const s = submissionStats[0];
     const p = pointsStats[0];
 
@@ -159,8 +160,10 @@ export async function getPlatformOverview(c: Context) {
       (s?.snapshotRejected ?? 0);
 
     return c.json({
-      totalMembers: (r2?.totalMembers ?? 0) + (r1?.totalMembers ?? 0),
-      newMembersThisWeek: (r2?.newThisWeek ?? 0) + (r1?.newThisWeek ?? 0),
+      totalMembers: r1?.totalMembers ?? 0,
+      newMembersThisWeek: r1?.newThisWeek ?? 0,
+      rail2Members: r2?.totalRail2Members ?? 0,
+      rail2MembersNewThisWeek: r2?.newThisWeek ?? 0,
 
       proofsThisWeek: s?.proofsThisWeek ?? 0,
       proofsChangePercent: pct(
