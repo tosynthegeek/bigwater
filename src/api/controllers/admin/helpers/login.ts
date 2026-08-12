@@ -89,6 +89,8 @@ export async function issueAdminSession(
     `admin_session=${token}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=${SESSION_TTL_SECONDS}`,
   );
 
+  c.set("user", admin);
+
   return c.json(
     {
       admin: {
