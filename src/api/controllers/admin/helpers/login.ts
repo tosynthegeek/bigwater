@@ -79,14 +79,9 @@ export async function issueAdminSession(
     JWT_ALGORITHM,
   );
 
-  // Lax, not Strict — Strict blocks the cookie from ever being attached to a
-  // cross-origin fetch at all (frontend and backend are separate origins),
-  // which is exactly how the frontend calls this API. Lax still isn't sent
-  // on cross-site subrequests from third-party pages, so real CSRF exposure
-  // is unchanged.
   c.header(
     "Set-Cookie",
-    `admin_session=${token}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=${SESSION_TTL_SECONDS}`,
+    `admin_session=${token}; HttpOnly; Secure; SameSite=None; Path=/; Max-Age=${SESSION_TTL_SECONDS}`,
   );
 
   c.set("user", admin);
@@ -127,7 +122,7 @@ export async function adminLogout(c: Context) {
 
   c.header(
     "Set-Cookie",
-    "admin_session=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0",
+    "admin_session=; HttpOnly; Secure; SameSite=None; Path=/; Max-Age=0",
   );
 
   return c.json({ ok: true }, 200);
