@@ -57,9 +57,7 @@ export const privyAuth = createMiddleware<Env>(async (c, next) => {
   const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
 
   if (!token) {
-    const admin = await resolveAdminSessionCookie(
-      c.req.header("cookie") ?? "",
-    );
+    const admin = await resolveAdminSessionCookie(c.req.header("cookie") ?? "");
     c.set("user", admin);
     if (!admin) console.log("no token found");
     return next();
@@ -180,6 +178,11 @@ export const requireAuth = createMiddleware<Env>(async (c, next) => {
 
 export const requireAdmin = createMiddleware<Env>(async (c, next) => {
   const user = c.get("user");
+
+  console.log("[requireAdmin] user:", {
+    id: user?.id,
+    role: user?.role,
+  });
   if (!user || (user.role !== "admin" && user.role !== "superadmin")) {
     return c.json({ error: "Admin access required" }, 403);
   }
@@ -206,11 +209,26 @@ export const requireBotSecret = createMiddleware(async (c, next) => {
 
 export const adminSessionAuth = createMiddleware<Env>(async (c, next) => {
   const authHeader = c.req.header("authorization");
+  const cookie = c.req.header("cookie") ?? "";
+
+  console.log("[adminSessionAuth]", {
+    hasAuthorization: !!authHeader,
+    hasCookie: !!cookie,
+    hasAdminSession: cookie.includes("admin_session="),
+  });
+
   if (authHeader?.startsWith("Bearer ")) {
     return adminLoginAuth(c, next);
   }
 
-  const admin = await resolveAdminSessionCookie(c.req.header("cookie") ?? "");
+  const admin = await resolveAdminSessionCookie(cookie);
+
+  console.log("[adminSessionAuth] resolved admin:", {
+    id: admin?.id,
+    role: admin?.role,
+  });
+
   c.set("user", admin);
+
   return next();
 });
