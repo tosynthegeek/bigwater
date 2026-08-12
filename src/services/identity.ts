@@ -7,11 +7,29 @@ import {
 } from "@/db/schema/rail2";
 import { rail1Users } from "@/db/schema/rail1";
 import { privy } from "@/privy";
+import { verifyRail1Token } from "@/middleware/rail1-jwt";
 
 const TELEGRAM_LINK_CODE_TTL_MS = 10 * 60 * 1000;
 const TELEGRAM_BOT_CONNECT_POINTS = 50;
 
-export async function getOrCreateUserByPrivyDid(privyDid: string) {
+export class AuthenticationError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "AuthenticationError";
+  }
+}
+
+export class Rail1LinkError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "Rail1LinkError";
+  }
+}
+
+export async function getOrCreateUserByPrivyDid(
+  privyDid: string,
+  rail1Token: string | undefined,
+) {
   const existing = await db.query.authUsers.findFirst({
     where: eq(authUsers.privyDid, privyDid),
     with: {
@@ -19,7 +37,52 @@ export async function getOrCreateUserByPrivyDid(privyDid: string) {
     },
   });
 
-  if (existing) return existing;
+  if (existing) {
+    if (!existing.participantProfile?.rail1UserId) {
+      if (!rail1Token) {
+        throw new Rail1LinkError("X-Rail1-Token header required");
+      }
+
+      let rail1UserId: string;
+
+      try {
+        rail1UserId = await verifyRail1Token(rail1Token);
+      } catch {
+        throw new Rail1LinkError("Invalid Rail1 token");
+      }
+
+      const [updated] = await db
+        .update(participantProfile)
+        .set({ rail1UserId })
+        .where(eq(participantProfile.userId, existing.id))
+        .returning();
+
+      if (!updated) {
+        throw new AuthenticationError(
+          `Update to participantProfile returned no row for userId=${existing.id}`,
+        );
+      }
+
+      return {
+        ...existing,
+        participantProfile: updated,
+      };
+    }
+
+    return existing;
+  }
+
+  if (!rail1Token) {
+    throw new Rail1LinkError("X-Rail1-Token header required");
+  }
+
+  let rail1UserId: string;
+
+  try {
+    rail1UserId = await verifyRail1Token(rail1Token);
+  } catch {
+    throw new Rail1LinkError("Invalid Rail1 token");
+  }
 
   return db.transaction(async (tx) => {
     const [user] = await tx
@@ -30,7 +93,7 @@ export async function getOrCreateUserByPrivyDid(privyDid: string) {
       .returning();
 
     if (!user) {
-      throw new Error(
+      throw new AuthenticationError(
         `Insert into users returned no row for privyDid=${privyDid}`,
       );
     }
@@ -39,11 +102,12 @@ export async function getOrCreateUserByPrivyDid(privyDid: string) {
       .insert(participantProfile)
       .values({
         userId: user.id,
+        rail1UserId,
       })
       .returning();
 
     if (!profile) {
-      throw new Error(
+      throw new AuthenticationError(
         `Insert into participantProfile returned no row for userId=${user.id}`,
       );
     }

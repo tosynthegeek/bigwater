@@ -3,6 +3,7 @@ import { createMiddleware } from "hono/factory";
 import {
   getOrcreateAdminByPrivyDid,
   getOrCreateUserByPrivyDid,
+  Rail1LinkError,
 } from "@/services/identity";
 import { authUsers, type User } from "@/db/schema/rail2";
 import { eq } from "drizzle-orm";
@@ -19,6 +20,7 @@ type Env = {
 
 export const privyAuth = createMiddleware<Env>(async (c, next) => {
   const authHeader = c.req.header("authorization");
+  const rail1Token = c.req.header("x-rail1-token");
   const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
 
   if (!token) {
@@ -27,36 +29,64 @@ export const privyAuth = createMiddleware<Env>(async (c, next) => {
     return next();
   }
 
-  try {
-    const claims = await privy.utils().auth().verifyAccessToken(token);
-    const user = await getOrCreateUserByPrivyDid(claims.user_id);
-    // let user_id = "test-user-id";
-    // const user = await getOrCreateUserByPrivyDid(user_id);
+  let claims;
 
-    c.set("user", user);
+  try {
+    claims = await privy.utils().auth().verifyAccessToken(token);
   } catch (err: any) {
     const message = err?.message ?? "";
+
     const isTransientAuth =
       message.includes("Failed to verify") ||
       message.includes("JWKS") ||
       message.includes("JWT");
 
-    if (isTransientAuth) {
-      try {
-        await new Promise((r) => setTimeout(r, 150));
-        const claims = await privy.utils().auth().verifyAccessToken(token);
-        const user = await getOrCreateUserByPrivyDid(claims.user_id);
-        c.set("user", user);
-        return next();
-      } catch (retryErr: any) {
-        console.error("[privyAuth] token verification failed (after retry)");
-        console.error("  message:", retryErr?.message);
-        c.set("user", null);
-      }
-    } else {
-      console.error("[privyAuth] auth pipeline error:", message);
+    if (!isTransientAuth) {
+      console.error("[privyAuth] token verification failed:", message);
       c.set("user", null);
+      return next();
     }
+
+    try {
+      await new Promise((r) => setTimeout(r, 150));
+
+      claims = await privy.utils().auth().verifyAccessToken(token);
+    } catch (retryErr: any) {
+      console.error(
+        "[privyAuth] token verification failed after retry:",
+        retryErr?.message,
+      );
+
+      c.set("user", null);
+      return next();
+    }
+  }
+
+  try {
+    const user = await getOrCreateUserByPrivyDid(claims.user_id, rail1Token);
+    // let user_id = "test-user-id";
+    // const user = await getOrCreateUserByPrivyDid(user_id, rail1Token);
+
+    c.set("user", user);
+  } catch (err) {
+    if (err instanceof Rail1LinkError) {
+      return c.json(
+        {
+          error: "rail1_link_error",
+          message: err.message,
+        },
+        401,
+      );
+    }
+
+    console.error("[privyAuth] failed to resolve user:", err);
+    return c.json(
+      {
+        error: "internal_server_error",
+        message: "Failed to resolve authenticated user",
+      },
+      500,
+    );
   }
 
   return next();
@@ -152,7 +182,11 @@ export const adminSessionAuth = createMiddleware(async (c, next) => {
   }
 
   try {
-    const payload = await verify(token, Bun.env.ADMIN_SESSION_SECRET, JWT_ALGORITHM);
+    const payload = await verify(
+      token,
+      Bun.env.ADMIN_SESSION_SECRET,
+      JWT_ALGORITHM,
+    );
     const revoked = await redisClient.get(`revoked:${payload.jti}`);
     if (revoked) {
       c.set("user", null);
