@@ -1,7 +1,7 @@
 import { Context } from "hono";
 import { db } from "@/db";
 import { authUsers, type User } from "@/db/schema/rail2";
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, or, sql } from "drizzle-orm";
 import {
   addAdminBodySchema,
   resetAdminPasswordSchema,
@@ -9,6 +9,23 @@ import {
   updateOwnPasswordSchema,
 } from "@/zod/admin";
 import { handlePasswordLogin, handlePrivyLogin } from "./helpers/login";
+
+// Finds any existing row for this identity, whether it's a currently-claimed
+// account (email/walletAddress populated) or a still-unclaimed placeholder
+// (this codebase's convention: privyDid holds the raw email/wallet string
+// until a real Privy login claims it — see getOrcreateAdminByPrivyDid in
+// services/identity.ts). Matching only email/walletAddress would miss the
+// unclaimed-placeholder shape entirely.
+async function findExistingByIdentifier(email?: string, walletAddress?: string) {
+  const identifier = (email ?? walletAddress)!.toLowerCase();
+  return db.query.authUsers.findFirst({
+    where: or(
+      eq(sql`lower(${authUsers.privyDid})`, identifier),
+      email ? eq(authUsers.email, identifier) : undefined,
+      walletAddress ? eq(authUsers.walletAddress, identifier) : undefined,
+    ),
+  });
+}
 
 export async function adminLogin(c: Context) {
   const authHeader = c.req.header("authorization");
@@ -72,25 +89,89 @@ export async function addAdmin(c: Context) {
   try {
     if (validatedBody.data.method === "privy") {
       const { email, walletAddress } = validatedBody.data.identifier;
-      const identifier = (email ?? walletAddress)!;
+      const identifier = (email ?? walletAddress)!.toLowerCase();
+      const existing = await findExistingByIdentifier(email, walletAddress);
+
+      if (existing) {
+        // Only ever true for a previously-revoked admin — revokeAdmin
+        // (below) is the sole writer of status:"inactive" anywhere in this
+        // codebase, and an unclaimed placeholder always has role:"admin"
+        // (never "user"), so there's no ambiguity with a pending invite
+        // here. Reactivate the same row instead of inserting a duplicate —
+        // this is the fix for the "re-invite silently orphaned" bug.
+        if (existing.role === "user" && existing.status === "inactive") {
+          const [reactivated] = await db
+            .update(authUsers)
+            .set({ role: "admin", status: "active" })
+            .where(eq(authUsers.id, existing.id))
+            .returning();
+
+          return c.json({ admin: reactivated, reactivated: true }, 200);
+        }
+
+        // Already an active admin/superadmin, or an unclaimed invite
+        // already pending for this identity — don't silently overwrite
+        // either; tell the caller plainly what's actually going on.
+        const pending = !existing.email && !existing.walletAddress;
+        return c.json(
+          {
+            error: pending
+              ? "This identity has already been invited and is awaiting claim."
+              : `This identity already has an account (role: ${existing.role}, status: ${existing.status}).`,
+          },
+          409,
+        );
+      }
+
       const [created] = await db
         .insert(authUsers)
         .values({
-          privyDid: identifier.toLocaleLowerCase(),
+          privyDid: identifier,
           role: "admin",
         })
         .returning();
 
-      return c.json({ admin: created }, 201);
+      return c.json({ admin: created, reactivated: false }, 201);
     }
 
     const { email, username, password } = validatedBody.data;
+    const normalizedEmail = email.toLowerCase();
+    const existing = await findExistingByIdentifier(normalizedEmail);
+
+    if (existing) {
+      if (existing.role === "user" && existing.status === "inactive") {
+        const passwordHash = await Bun.password.hash(password);
+        const [reactivated] = await db
+          .update(authUsers)
+          .set({
+            role: "admin",
+            status: "active",
+            username,
+            passwordHash,
+          })
+          .where(eq(authUsers.id, existing.id))
+          .returning();
+
+        return c.json({ admin: reactivated, reactivated: true }, 200);
+      }
+
+      const pending = !existing.email && !existing.walletAddress;
+      return c.json(
+        {
+          error: pending
+            ? "This identity has already been invited and is awaiting claim."
+            : `This identity already has an account (role: ${existing.role}, status: ${existing.status}).`,
+        },
+        409,
+      );
+    }
+
     const passwordHash = await Bun.password.hash(password);
 
     const [created] = await db
       .insert(authUsers)
       .values({
-        email: email.toLowerCase(),
+        email: normalizedEmail,
         username,
         passwordHash,
         role: "admin",
@@ -98,10 +179,31 @@ export async function addAdmin(c: Context) {
       })
       .returning();
 
-    return c.json({ admin: created }, 201);
+    return c.json({ admin: created, reactivated: false }, 201);
   } catch (error: any) {
     if (error?.code === "23505") {
-      return c.json({ error: "Email or username already in use" }, 409);
+      // Best-effort: report which identity column actually collided rather
+      // than a blanket message — falls back to the generic message if the
+      // driver doesn't expose a constraint name in the shape expected here.
+      const constraint: string | undefined = error?.constraint;
+      const field = constraint?.includes("email")
+        ? "email"
+        : constraint?.includes("username")
+          ? "username"
+          : constraint?.includes("wallet_address")
+            ? "wallet address"
+            : constraint?.includes("privy_did")
+              ? "identifier"
+              : undefined;
+
+      return c.json(
+        {
+          error: field
+            ? `This ${field} is already in use by another account.`
+            : "Email or username already in use",
+        },
+        409,
+      );
     }
 
     console.error("AdminControllers.addAdmin.error: ", error);
