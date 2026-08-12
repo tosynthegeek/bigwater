@@ -12,7 +12,7 @@ import {
   requireAuth,
   requireAdmin,
   requireServiceAuth,
-  adminLoginAuth,
+  adminSessionAuth,
 } from "@/middleware/auth";
 
 import ApiRouter from "@/api/routes/api-routes";
@@ -96,7 +96,13 @@ app.get("/uploads/:filename", async (c) => {
 });
 
 app.use("/api/admin/login", adminLogin);
-app.use("/api/admin/*", adminLoginAuth, requireAdmin);
+// adminSessionAuth accepts EITHER a Privy bearer token (delegating to the
+// same adminLoginAuth check this replaced) OR the admin_session cookie
+// issued by the password-login path (helpers/login.ts's issueAdminSession)
+// — a strict superset, so the existing bearer-token flow is unaffected.
+// Without this, a password-only admin could log in but then get 401 on
+// every other /api/admin/* route, since none of them accepted the cookie.
+app.use("/api/admin/*", adminSessionAuth, requireAdmin);
 app.route("/api/admin", AdminRouter);
 app.use("/api/*", privyAuth);
 app.use("/api/*", requireAuth);

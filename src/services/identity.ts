@@ -38,6 +38,14 @@ export async function getOrCreateUserByPrivyDid(
   });
 
   if (existing) {
+    // Rail1 linking is a member-only concept — an admin/superadmin calling a
+    // plain member route (e.g. GET /tasks) resolves through this same
+    // privyDid lookup, but must never be forced through the X-Rail1-Token
+    // flow just because they (like most admins) have no rail1 account.
+    if (existing.role !== "user") {
+      return existing;
+    }
+
     if (!existing.participantProfile?.rail1UserId) {
       if (!rail1Token) {
         throw new Rail1LinkError("X-Rail1-Token header required");

@@ -180,7 +180,15 @@ export async function getAdmin(c: Context) {
       return c.json({ error: "Admin not found" }, 404);
     }
 
-    return c.json({ admin }, 200);
+    // passwordHash was being sent to the client verbatim — strip it and
+    // expose only whether one is set, which is what the frontend actually
+    // needs (e.g. to hide "Change my password" for Privy-only admins).
+    const { passwordHash, ...safeAdmin } = admin;
+
+    return c.json(
+      { admin: { ...safeAdmin, hasPassword: passwordHash !== null } },
+      200,
+    );
   } catch (error) {
     console.error("AdminControllers.getAdmin.error: ", error);
     return c.json({ error: "Internal server error" }, 500);

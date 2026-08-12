@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import { getCustomSubmissions } from "@/api/controllers/submissions-controllers";
+import { adminLogout } from "@/api/controllers/admin/helpers/login";
 import {
   activateTask,
   createTask,
@@ -71,6 +72,7 @@ AdminRouter.get("/admins", getAllAdmins);
 AdminRouter.post("/add", addAdmin);
 AdminRouter.post("/revoke", revokeAdmin);
 AdminRouter.get("/profile", getAdmin);
+AdminRouter.post("/logout", adminLogout);
 
 AdminRouter.post("/telegram/broadcast", sendTelegramBroadcast);
 export default AdminRouter;

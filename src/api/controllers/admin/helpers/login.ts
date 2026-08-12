@@ -6,8 +6,9 @@ import { nanoid } from "@/utils/nanoid";
 import { getOrcreateAdminByPrivyDid } from "@/services/identity";
 import { privy } from "@/privy";
 import { checkRateLimit } from "@/utils/time";
-import { sign } from "hono/jwt";
+import { sign, verify } from "hono/jwt";
 import { JWT_ALGORITHM } from "@/middleware/rail1-jwt";
+import redisClient from "@/redis";
 
 const SESSION_TTL_SECONDS = 60 * 60 * 8;
 const SECRET = Bun.env.ADMIN_SESSION_SECRET;
@@ -78,13 +79,54 @@ export async function issueAdminSession(
     JWT_ALGORITHM,
   );
 
+  // Lax, not Strict — Strict blocks the cookie from ever being attached to a
+  // cross-origin fetch at all (frontend and backend are separate origins),
+  // which is exactly how the frontend calls this API. Lax still isn't sent
+  // on cross-site subrequests from third-party pages, so real CSRF exposure
+  // is unchanged.
   c.header(
     "Set-Cookie",
-    `admin_session=${token}; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=${SESSION_TTL_SECONDS}`,
+    `admin_session=${token}; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=${SESSION_TTL_SECONDS}`,
   );
 
   return c.json(
-    { admin: { id: admin.id, role: admin.role, email: admin.email } },
+    {
+      admin: {
+        id: admin.id,
+        role: admin.role,
+        email: admin.email,
+        hasPassword: admin.passwordHash !== null,
+      },
+    },
     200,
   );
+}
+
+// Clears the admin_session cookie and marks its jti revoked so the token
+// can't be replayed even if it leaked before expiry — adminSessionAuth
+// (src/middleware/auth.ts) already checks `revoked:<jti>` on every request,
+// this is the first thing that ever writes it. Idempotent: a missing or
+// already-invalid cookie is treated as "already logged out", not an error.
+export async function adminLogout(c: Context) {
+  const cookie = c.req.header("cookie") ?? "";
+  const token = cookie.match(/admin_session=([^;]+)/)?.[1];
+
+  if (token) {
+    try {
+      const payload = await verify(token, SECRET, JWT_ALGORITHM);
+      const jti = payload.jti as string;
+      const exp = payload.exp as number;
+      const ttlSeconds = Math.max(1, exp - Math.floor(Date.now() / 1000));
+      await redisClient.set(`revoked:${jti}`, "1", "EX", ttlSeconds);
+    } catch {
+      // Already expired/invalid/malformed — nothing to revoke.
+    }
+  }
+
+  c.header(
+    "Set-Cookie",
+    "admin_session=; HttpOnly; Secure; SameSite=Lax; Path=/; Max-Age=0",
+  );
+
+  return c.json({ ok: true }, 200);
 }

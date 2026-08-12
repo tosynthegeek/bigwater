@@ -18,14 +18,50 @@ type Env = {
   };
 };
 
+// Resolves the admin_session cookie (issued by the password-login path,
+// helpers/login.ts's issueAdminSession) into a User, or null if there isn't
+// one / it's invalid / revoked. Shared by adminSessionAuth (admin-only
+// routes) and privyAuth's fallback below — a password-only admin has no
+// Privy bearer token at all, so without this fallback they could only ever
+// call /api/admin/* routes, and every plain /api/* route (e.g. GET /tasks)
+// would 401 them despite a perfectly valid session.
+async function resolveAdminSessionCookie(
+  cookieHeader: string,
+): Promise<User | null> {
+  const token = cookieHeader.match(/admin_session=([^;]+)/)?.[1];
+  if (!token) return null;
+
+  try {
+    const payload = await verify(
+      token,
+      Bun.env.ADMIN_SESSION_SECRET,
+      JWT_ALGORITHM,
+    );
+    const revoked = await redisClient.get(`revoked:${payload.jti}`);
+    if (revoked) return null;
+
+    const admin = await db.query.authUsers.findFirst({
+      where: eq(authUsers.id, payload.sub as string),
+    });
+
+    if (!admin || admin.status !== "active") return null;
+    return admin;
+  } catch {
+    return null;
+  }
+}
+
 export const privyAuth = createMiddleware<Env>(async (c, next) => {
   const authHeader = c.req.header("authorization");
   const rail1Token = c.req.header("x-rail1-token");
   const token = authHeader?.startsWith("Bearer ") ? authHeader.slice(7) : null;
 
   if (!token) {
-    c.set("user", null);
-    console.log("no token found");
+    const admin = await resolveAdminSessionCookie(
+      c.req.header("cookie") ?? "",
+    );
+    c.set("user", admin);
+    if (!admin) console.log("no token found");
     return next();
   }
 
@@ -168,44 +204,13 @@ export const requireBotSecret = createMiddleware(async (c, next) => {
   return next();
 });
 
-export const adminSessionAuth = createMiddleware(async (c, next) => {
+export const adminSessionAuth = createMiddleware<Env>(async (c, next) => {
   const authHeader = c.req.header("authorization");
   if (authHeader?.startsWith("Bearer ")) {
     return adminLoginAuth(c, next);
   }
 
-  const cookie = c.req.header("cookie") ?? "";
-  const token = cookie.match(/admin_session=([^;]+)/)?.[1];
-  if (!token) {
-    c.set("user", null);
-    return next();
-  }
-
-  try {
-    const payload = await verify(
-      token,
-      Bun.env.ADMIN_SESSION_SECRET,
-      JWT_ALGORITHM,
-    );
-    const revoked = await redisClient.get(`revoked:${payload.jti}`);
-    if (revoked) {
-      c.set("user", null);
-      return next();
-    }
-
-    const admin = await db.query.authUsers.findFirst({
-      where: eq(authUsers.id, payload.sub as string),
-    });
-
-    if (!admin || admin.status !== "active") {
-      c.set("user", null);
-      return next();
-    }
-
-    c.set("user", admin);
-  } catch {
-    c.set("user", null);
-  }
-
+  const admin = await resolveAdminSessionCookie(c.req.header("cookie") ?? "");
+  c.set("user", admin);
   return next();
 });
