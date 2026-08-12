@@ -11,7 +11,6 @@ import {
   submitProof,
 } from "@/api/controllers/submissions-controllers";
 import { leaderboard } from "../controllers/leaderboard-controllers";
-import { publicRateLimiter } from "@/middleware/rate-limit";
 
 const ApiRouter = new Hono();
 
