@@ -12,6 +12,7 @@ import {
   requireAuth,
   requireAdmin,
   requireServiceAuth,
+  adminLoginAuth,
 } from "@/middleware/auth";
 
 import ApiRouter from "@/api/routes/api-routes";
@@ -95,13 +96,12 @@ app.get("/uploads/:filename", async (c) => {
 });
 
 app.use("/api/admin/login", adminLogin);
+app.use("/api/admin/*", adminLoginAuth, requireAdmin);
+app.route("/api/admin", AdminRouter);
 app.use("/api/*", privyAuth);
 app.use("/api/*", requireAuth);
-
-app.use("/api/admin/*", privyAuth, requireAdmin);
 app.use("/internal/*", requireServiceAuth);
 
-app.route("/api/admin", AdminRouter);
 app.route("/api", ApiRouter);
 app.route("/internal", InternalRouter);
 
