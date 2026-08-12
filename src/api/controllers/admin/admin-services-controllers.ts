@@ -207,7 +207,7 @@ export async function sendTelegramBroadcast(c: Context) {
     );
   }
 
-  if (user.role !== "admin") {
+  if (user.role !== "admin" && user.role !== "superadmin") {
     return c.json(
       {
         error: "Forbidden",
