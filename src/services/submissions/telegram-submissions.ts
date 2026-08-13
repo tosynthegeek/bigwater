@@ -29,10 +29,16 @@ export async function createTelegramSubmission(
       { jobId: submission.id },
     );
 
-    return submission;
+    return {
+      ok: true as const,
+      submission,
+    };
   } catch (error) {
     if (error instanceof SubmissionRejectedError) {
-      throw new Error(`SUBMISSION_REJECTED:${error.message}`);
+      return {
+        ok: false as const,
+        message: error.message,
+      };
     }
 
     throw error;

@@ -33,9 +33,14 @@ export async function submitProofConversation(
   }
 
   try {
-    await conversation.external(() =>
+    const result = await conversation.external(() =>
       createTelegramSubmission(photo.file_id, user.id, taskId),
     );
+
+    if (!result.ok) {
+      await ctx.reply(result.message);
+      return;
+    }
 
     await ctx.reply(
       "Got your photo! Submission is queued for verification. You'll be notified once it's processed.",
