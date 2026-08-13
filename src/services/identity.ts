@@ -135,6 +135,18 @@ export async function getOrcreateAdminByPrivyDid(privyDid: string) {
     },
   });
 
+  // This exact Privy DID is already linked to a row, but that row can't
+  // actually authenticate as admin — most commonly a previously-revoked
+  // admin whose privyDid/email/walletAddress were never cleared (revokeAdmin
+  // only flips role/status). Surfacing this here turns "why is my login
+  // rejected with no explanation" into a one-line log read instead of a
+  // multi-table DB trace.
+  if (existing && (existing.role === "user" || existing.status !== "active")) {
+    console.warn(
+      `[getOrcreateAdminByPrivyDid] Privy DID ${privyDid} resolved to non-admin row ${existing.id} (role=${existing.role}, status=${existing.status}) — login will be rejected. If this admin was recently re-invited, check for an unclaimed placeholder row sharing this identity.`,
+    );
+  }
+
   if (existing) return existing;
 
   try {
