@@ -179,10 +179,6 @@ export const requireAuth = createMiddleware<Env>(async (c, next) => {
 export const requireAdmin = createMiddleware<Env>(async (c, next) => {
   const user = c.get("user");
 
-  console.log("[requireAdmin] user:", {
-    id: user?.id,
-    role: user?.role,
-  });
   if (!user || (user.role !== "admin" && user.role !== "superadmin")) {
     return c.json({ error: "Admin access required" }, 403);
   }
@@ -222,11 +218,6 @@ export const adminSessionAuth = createMiddleware<Env>(async (c, next) => {
   }
 
   const admin = await resolveAdminSessionCookie(cookie);
-
-  console.log("[adminSessionAuth] resolved admin:", {
-    id: admin?.id,
-    role: admin?.role,
-  });
 
   c.set("user", admin);
 
