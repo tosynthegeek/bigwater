@@ -29,9 +29,14 @@ export async function getActiveTasks(): Promise<ActiveTask[]> {
 }
 
 export async function getTaskById(taskId: string) {
-  return db.query.tasks.findFirst({
+  const task = await db.query.tasks.findFirst({
     where: eq(tasks.id, taskId),
   });
+
+  if (!task) {
+    throw new Error(`Task with id ${taskId} not found`);
+  }
+  return task;
 }
 
 export async function createtask(params: CreateTaskParams) {

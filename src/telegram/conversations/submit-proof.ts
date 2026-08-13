@@ -1,6 +1,7 @@
 import { resolveUserByTelegramId } from "@/services/identity";
 import { createTelegramSubmission } from "@/services/submissions/telegram-submissions";
 import type { BotContext, BotConversation } from "@/telegram/bot";
+import { SubmissionRejectedError } from "@/utils/errors";
 
 export async function submitProofConversation(
   conversation: BotConversation,
@@ -21,11 +22,7 @@ export async function submitProofConversation(
     return;
   }
 
-  await ctx.reply(
-    taskId === "custom"
-      ? "Send a photo of what you did — an admin will review it."
-      : "Send a photo as proof for that task.",
-  );
+  await ctx.reply("Send a photo as proof for that task.");
 
   const photoCtx = await conversation.waitFor("message:photo");
   const photo = photoCtx.message.photo.at(-1);
@@ -45,6 +42,12 @@ export async function submitProofConversation(
     );
   } catch (error) {
     console.error("Error creating submission:", error);
+
+    if (error instanceof SubmissionRejectedError) {
+      await ctx.reply(error.message);
+      return;
+    }
+
     await ctx.reply(
       "There was an error processing your submission. Please try again later.",
     );

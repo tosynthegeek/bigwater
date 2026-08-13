@@ -27,8 +27,8 @@ export const notificationWorker = new Worker(
 
     const message =
       status === "approved"
-        ? `✅ Your submission for "${task?.title ?? "your task"}" was approved!`
-        : `❌ Your submission for "${task?.title ?? "your task"}" was rejected.`;
+        ? `✅ Your submission for ${task.title} was approved!`
+        : `❌ Your submission for ${task.title} was rejected.`;
 
     await bot.api.sendMessage(user.telegramId, message);
   },
