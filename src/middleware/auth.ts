@@ -207,12 +207,6 @@ export const adminSessionAuth = createMiddleware<Env>(async (c, next) => {
   const authHeader = c.req.header("authorization");
   const cookie = c.req.header("cookie") ?? "";
 
-  console.log("[adminSessionAuth]", {
-    hasAuthorization: !!authHeader,
-    hasCookie: !!cookie,
-    hasAdminSession: cookie.includes("admin_session="),
-  });
-
   if (authHeader?.startsWith("Bearer ")) {
     return adminLoginAuth(c, next);
   }

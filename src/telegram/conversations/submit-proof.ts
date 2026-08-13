@@ -42,16 +42,10 @@ export async function submitProofConversation(
     );
   } catch (error) {
     console.error("Error creating submission:", error);
-    console.error("Error details:", {
-      name: error instanceof Error ? error.name : typeof error,
-      message: error instanceof Error ? error.message : String(error),
-      status:
-        error instanceof SubmissionRejectedError ? error.status : undefined,
-      instanceof: error instanceof SubmissionRejectedError,
-    });
+    const message = error instanceof Error ? error.message : "";
 
-    if (error instanceof SubmissionRejectedError) {
-      await ctx.reply(error.message);
+    if (message.startsWith("SUBMISSION_REJECTED:")) {
+      await ctx.reply(message.slice("SUBMISSION_REJECTED:".length));
       return;
     }
 
