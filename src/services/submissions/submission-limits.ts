@@ -16,6 +16,7 @@ export async function enforceSubmissionLimits(
   const limits = await db.query.submissionLimits.findFirst();
 
   if (!limits) {
+    console.error("Submission limits not configured");
     throw new Error("Submission limits not configured");
   }
 

@@ -46,8 +46,11 @@ export async function createSubmission(
     .returning();
 
   if (!submission) {
-    throw new Error(
-      `Insert into submissions returned no row for taskId=${taskId}, userId=${userId}`,
+    console.error(
+      `Failed to create submission for task ${task.title} by user ${userId}`,
+    );
+    throw new SubmissionRejectedError(
+      `Failed to create submission for task ${task.title}. Please try again later.`,
     );
   }
 

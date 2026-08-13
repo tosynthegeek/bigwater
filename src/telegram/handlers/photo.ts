@@ -22,9 +22,6 @@ export function registerPhotoHandler(bot: Bot<BotContext>) {
 
 export async function getTelegramPhotoFile(fileId: string): Promise<File> {
   const token = Bun.env.TELEGRAM_BOT_TOKEN;
-  if (!token) {
-    throw new Error("TELEGRAM_BOT_TOKEN is not set");
-  }
 
   const tgFile = await bot.api.getFile(fileId);
 
