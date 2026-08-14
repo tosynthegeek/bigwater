@@ -1,7 +1,6 @@
 import { resolveUserByTelegramId } from "@/services/identity";
 import { createTelegramSubmission } from "@/services/submissions/telegram-submissions";
 import type { BotContext, BotConversation } from "@/telegram/bot";
-import { SubmissionRejectedError } from "@/utils/errors";
 
 export async function submitProofConversation(
   conversation: BotConversation,

@@ -19,6 +19,6 @@ export function registerTaskHandlers(bot: Bot<BotContext>) {
       keyboard.text(task.title, `task:${task.id}`).row();
     }
 
-    await ctx.reply("What did you do?", { reply_markup: keyboard });
+    await ctx.reply("Select a task:", { reply_markup: keyboard });
   });
 }
