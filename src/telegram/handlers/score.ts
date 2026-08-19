@@ -22,11 +22,13 @@ export function registerScoreHandler(bot: Bot<BotContext>) {
       return;
     }
 
+    const multiplier = (summary.multiplier ?? 50) / 100;
+
     await ctx.reply(
       `🌱 *Sustainability Score*: ${summary.totalScore}\n` +
         `   Rail 2: ${summary.rail2score} · Rail 1: ${summary.rail1score}\n` +
         `🔥 *Streak*: ${summary.currentStreak ?? 0} (best ${summary.longestStreak ?? 0})\n` +
-        `📅 *This month*: ${summary.monthlyTally ?? 0} pts — ${summary.currentBand} (×${summary.multiplier})\n` +
+        `📅 *This month*: ${summary.monthlyTally ?? 0} pts — ${summary.currentBand} (×${multiplier.toFixed(1)})\n` +
         `🏆 Rank: #${summary.globalRank ?? "—"}`,
       {
         parse_mode: "Markdown",

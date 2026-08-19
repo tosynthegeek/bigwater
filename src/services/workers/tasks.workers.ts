@@ -26,7 +26,7 @@ export const taskNotificationWorker = new Worker(
 
     let sent = 0;
     let failed = 0;
-    const message = `📢 New task available: "${taskTitle}"\n\n${taskDescription}`;
+    const message = `📢 New task available: "${taskTitle}"\n\n${taskDescription}\n\nSend /tasks to see what you can submit today, or /help for all commands.`;
 
     for (const user of users) {
       if (!user.telegramId) {

@@ -42,7 +42,8 @@ export async function submitProofConversation(
     }
 
     await ctx.reply(
-      "Got your photo! Submission is queued for verification. You'll be notified once it's processed.",
+      "Got your photo! Submission is queued for verification. You'll be notified once it's processed.\n\n" +
+        "Send /tasks to see what else you can submit today, or /help for all commands.",
     );
   } catch (error) {
     console.error("Error creating submission:", error);
