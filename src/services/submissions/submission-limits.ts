@@ -1,5 +1,5 @@
 import { SubmissionRejectedError } from "@/utils/errors";
-import { and, count, desc, eq, gte, lt } from "drizzle-orm";
+import { and, count, desc, eq, gte, lt, ne } from "drizzle-orm";
 import { db } from "@/db";
 import { submissions, tasks } from "@/db/schema/rail2";
 import { periodIndex, timeframes } from "../economy/config";
@@ -26,6 +26,7 @@ export async function enforceSubmissionLimits(
       eq(submissions.taskId, task.id),
       gte(submissions.createdAt, periodStart),
       lt(submissions.createdAt, periodEnd),
+      ne(submissions.status, "rejected"),
     ),
   });
 
@@ -131,6 +132,7 @@ export async function getSubmissionLimitStatus(userId: string) {
     db
       .select({
         taskId: submissions.taskId,
+        status: submissions.status,
       })
       .from(submissions)
       .where(
@@ -179,7 +181,9 @@ export async function getSubmissionLimitStatus(userId: string) {
   const highValueUsed = todayHighValueSubmissions[0]?.totalHighValue ?? 0;
 
   const submittedTaskIds = new Set(
-    todaySubmissions.map((submission) => submission.taskId),
+    todaySubmissions
+      .filter((s) => s.status !== "rejected")
+      .map((s) => s.taskId),
   );
 
   const dailyLimitReached = submissionsUsed >= limits.maxSubmissionsPerDay;
