@@ -1,18 +1,12 @@
 import { db } from "@/db";
-import {
-  monthlyTally,
-  participantProfile,
-  pointsLedger,
-  submissions,
-  tasks,
-} from "@/db/schema/rail2";
-import { eq, sql } from "drizzle-orm";
+import { submissions, tasks } from "@/db/schema/rail2";
+import { and, desc, eq } from "drizzle-orm";
 import { uploadFileToS3 } from "@/services/s3";
-import { format } from "date-fns";
 import { SubmissionRejectedError } from "@/utils/errors";
 import { enforceSubmissionLimits } from "./submission-limits";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+type SubmissionStatus = "approved" | "rejected" | "under_review" | "pending";
 
 export async function createSubmission(
   userId: string,
@@ -61,4 +55,52 @@ export async function getSubmissionById(id: string) {
   return db.query.submissions.findFirst({
     where: eq(submissions.id, id),
   });
+}
+
+export async function getUserSubmissions(userId: string) {
+  const rows = await db
+    .select({
+      submission: submissions,
+      taskTitle: tasks.title,
+      basePoints: tasks.basePoints,
+    })
+    .from(submissions)
+    .leftJoin(tasks, eq(submissions.taskId, tasks.id))
+    .where(eq(submissions.userId, userId))
+    .orderBy(desc(submissions.createdAt));
+
+  const result = rows.map(({ submission, taskTitle, basePoints }) => ({
+    ...submission,
+    taskId: submission.taskId,
+    taskTitle: taskTitle,
+    basePoints: basePoints ?? 0,
+  }));
+
+  return result;
+}
+
+export async function getUserSubmissionsWithStatus(
+  userId: string,
+  status?: SubmissionStatus,
+) {
+  const rows = await db
+    .select({
+      submission: submissions,
+      taskTitle: tasks.title,
+      basePoints: tasks.basePoints,
+    })
+    .from(submissions)
+    .leftJoin(tasks, eq(submissions.taskId, tasks.id))
+    .where(
+      status
+        ? and(eq(submissions.userId, userId), eq(submissions.status, status))
+        : eq(submissions.userId, userId),
+    )
+    .orderBy(desc(submissions.createdAt));
+
+  return rows.map(({ submission, taskTitle, basePoints }) => ({
+    ...submission,
+    taskTitle,
+    basePoints: basePoints ?? 0,
+  }));
 }

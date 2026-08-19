@@ -1,20 +1,10 @@
 import { type Context } from "hono";
 import { generateTelegramLinkCode } from "@/services/identity";
-import {
-  monthlyTally,
-  participantProfile,
-  submissions,
-  sustainabilityScore,
-  tasks,
-  userStreaks,
-  type User,
-} from "@/db/schema/rail2";
+import { submissions, tasks, type User } from "@/db/schema/rail2";
 import { db } from "@/db";
-import { and, desc, eq, sql } from "drizzle-orm";
-import { getTallyPeriod } from "@/services/economy/tally";
-import { verifyRail1Token } from "@/middleware/rail1-jwt";
-import { rail1Users } from "@/db/schema/rail1";
-import { getBandForMonthlyTally } from "@/services/economy/bands";
+import { desc, eq } from "drizzle-orm";
+import { getUserScoreSummary } from "@/services/score";
+import { getUserSubmissions } from "@/services/submissions/submissions";
 
 // Web app calls this (authenticated) when the user clicks "link Telegram".
 // Returns a code the frontend turns into t.me/<bot_username>?start=<code>.
@@ -41,83 +31,12 @@ export async function getParticipantProfile(c: Context) {
   }
 
   const now = new Date();
-  const currentMonthKey = getTallyPeriod(now).key;
 
   try {
-    const [profile] = await db
-      .select({
-        userId: participantProfile.userId,
-        username: participantProfile.username,
-        isMember: participantProfile.isMember,
-        isFlagged: participantProfile.isFlagged,
-        walletAddress: rail1Users.walletAddress,
-        status: participantProfile.status,
-        telegramId: participantProfile.telegramId,
-
-        // sustainabilityScore rows are created lazily (on a member's first
-        // scored submission) — COALESCE keeps a brand-new participant with
-        // no score yet from disappearing from this query entirely.
-        totalScore: sql<number>`
-      COALESCE(${sustainabilityScore.totalScore}, 0) + COALESCE(${rail1Users.totalPoints}, 0)
-    `.mapWith(Number),
-        headStart:
-          sql<number>`COALESCE(${sustainabilityScore.headStart}, 0)`.mapWith(
-            Number,
-          ),
-        rail2score:
-          sql<number>`COALESCE(${sustainabilityScore.totalScore}, 0)`.mapWith(
-            Number,
-          ),
-        rail1score: rail1Users.totalPoints,
-        monthlyTally: monthlyTally.baseTally,
-        currentBand: monthlyTally.band,
-        multiplier: monthlyTally.multiplier,
-
-        currentStreak: userStreaks.currentStreak,
-        longestStreak: userStreaks.longestStreak,
-
-        globalRank: sql<number>`(
-      SELECT rank FROM (
-        SELECT
-          pp2.user_id,
-          RANK() OVER (
-            ORDER BY (COALESCE(ss2.total_score, 0) + COALESCE(r1_2.total_points, 0)) DESC
-          ) AS rank
-        FROM participant_profile pp2
-        LEFT JOIN sustainability_score ss2 ON ss2.user_id = pp2.user_id
-        LEFT JOIN users r1_2 ON r1_2.id = pp2.rail1_user_id
-      ) ranked
-      WHERE ranked.user_id = ${user.id}
-    )`
-          .mapWith(Number)
-          .as("global_rank"),
-      })
-      .from(participantProfile)
-      .where(eq(participantProfile.userId, user.id))
-      .leftJoin(
-        sustainabilityScore,
-        eq(sustainabilityScore.userId, participantProfile.userId),
-      )
-      .leftJoin(
-        monthlyTally,
-        and(
-          eq(monthlyTally.userId, participantProfile.userId),
-          eq(monthlyTally.month, currentMonthKey),
-          eq(monthlyTally.isFinalized, false),
-        ),
-      )
-      .leftJoin(userStreaks, eq(userStreaks.userId, user.id))
-      .leftJoin(rail1Users, eq(rail1Users.id, participantProfile.rail1UserId));
+    const profile = await getUserScoreSummary(user.id);
 
     if (!profile) {
       return c.json({ error: "Profile not found" }, 404);
-    }
-
-    if (profile.currentBand === null) {
-      const fallbackBand = await getBandForMonthlyTally(0);
-      profile.monthlyTally = 0;
-      profile.currentBand = fallbackBand.name;
-      profile.multiplier = fallbackBand.multiplier;
     }
 
     return c.json({ profile }, 200);
@@ -138,23 +57,7 @@ export async function getParticipantSubmissions(c: Context) {
   }
 
   try {
-    const rows = await db
-      .select({
-        submission: submissions,
-        taskTitle: tasks.title,
-        basePoints: tasks.basePoints,
-      })
-      .from(submissions)
-      .leftJoin(tasks, eq(submissions.taskId, tasks.id))
-      .where(eq(submissions.userId, user.id))
-      .orderBy(desc(submissions.createdAt));
-
-    const result = rows.map(({ submission, taskTitle, basePoints }) => ({
-      ...submission,
-      taskId: submission.taskId ?? "custom",
-      taskTitle: taskTitle ?? "Custom",
-      basePoints: basePoints ?? 0,
-    }));
+    const result = await getUserSubmissions(user.id);
 
     return c.json({ submissions: result }, 200);
   } catch (error) {

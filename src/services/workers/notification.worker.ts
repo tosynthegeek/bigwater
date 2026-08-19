@@ -6,6 +6,7 @@ import { makeConnection } from "@/redis";
 import { participantProfile } from "@/db/schema/rail2";
 import { db } from "@/db";
 import { eq } from "drizzle-orm";
+import { InlineKeyboard } from "grammy";
 
 export const notificationWorker = new Worker(
   "submission-notification",
@@ -25,12 +26,24 @@ export const notificationWorker = new Worker(
 
     const task = await getTaskById(taskId);
 
+    if (!task) {
+      console.error(`Task ${taskId} not found for notification`);
+      return;
+    }
+
     const message =
       status === "approved"
         ? `✅ Your submission for ${task.title} was approved!`
         : `❌ Your submission for ${task.title} was rejected.`;
 
-    await bot.api.sendMessage(user.telegramId, message);
+    const replyMarkup =
+      status === "rejected"
+        ? new InlineKeyboard().text("🔄 Resubmit", `resubmit:${taskId}`)
+        : undefined;
+
+    await bot.api.sendMessage(user.telegramId, message, {
+      ...(replyMarkup ? { reply_markup: replyMarkup } : {}),
+    });
   },
   { connection: makeConnection() },
 );

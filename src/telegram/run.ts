@@ -3,6 +3,11 @@ import { registerStartHandler } from "@/telegram/handlers/start";
 import { registerTaskHandlers } from "@/telegram/handlers/tasks";
 import { registerPhotoHandler } from "@/telegram/handlers/photo";
 import { registerCallbackHandlers } from "@/telegram/handlers/callbacks";
+import { registerResubmitHandler } from "./handlers/resubmit";
+import { registerLimitsHandler } from "./handlers/limits";
+import { registerSubmissionsHandlers } from "./handlers/submissions";
+import { registerScoreHandler } from "./handlers/score";
+import { registerHelpHandler } from "./handlers/help";
 
 let started = false;
 
@@ -23,6 +28,12 @@ export function startTelegramBot() {
   registerTaskHandlers(bot);
   registerPhotoHandler(bot);
   registerCallbackHandlers(bot);
+
+  registerResubmitHandler(bot);
+  registerLimitsHandler(bot);
+  registerSubmissionsHandlers(bot);
+  registerScoreHandler(bot);
+  registerHelpHandler(bot);
 
   bot.catch((err) => {
     console.error("Telegram.Bot.handler.error: ", err);

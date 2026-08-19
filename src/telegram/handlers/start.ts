@@ -1,6 +1,7 @@
 import type { Bot } from "grammy";
 import type { BotContext } from "@/telegram/bot";
 import { redeemTelegramLinkCode } from "@/services/identity";
+import { sendActiveTaskList } from "./tasks";
 
 export function registerStartHandler(bot: Bot<BotContext>) {
   bot.command("start", async (ctx) => {
@@ -40,7 +41,9 @@ export function registerStartHandler(bot: Bot<BotContext>) {
     }
 
     await ctx.reply(
-      "You're linked! Send /tasks to see what you can submit today.",
+      "You're linked! 🎉\n\n" +
+        "Send /tasks to see what you can submit today, or /help for all commands.",
     );
+    await sendActiveTaskList(ctx);
   });
 }
