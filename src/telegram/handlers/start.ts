@@ -1,6 +1,9 @@
 import type { Bot } from "grammy";
 import type { BotContext } from "@/telegram/bot";
-import { redeemTelegramLinkCode } from "@/services/identity";
+import {
+  redeemTelegramLinkCode,
+  resolveUserByTelegramId,
+} from "@/services/identity";
 import { sendActiveTaskList } from "./tasks";
 
 export function registerStartHandler(bot: Bot<BotContext>) {
@@ -20,6 +23,19 @@ export function registerStartHandler(bot: Bot<BotContext>) {
     // grammY exposes the deep-link payload via ctx.match for a plain
     // bot.command("start", ...) handler.
     const code = typeof ctx.match === "string" ? ctx.match.trim() : "";
+
+    const existingUser = await resolveUserByTelegramId(telegramUserId);
+
+    if (existingUser) {
+      await ctx.reply(
+        "Welcome back! 👋\n\n" +
+          "Your Telegram account is already linked to BigWater.\n\n" +
+          "Send /tasks to see what you can submit today, or /help for all commands.",
+      );
+
+      await sendActiveTaskList(ctx);
+      return;
+    }
 
     if (!code) {
       await ctx.reply(
