@@ -1,6 +1,10 @@
+import { db } from "@/db";
+import { tasks } from "@/db/schema/rail2";
 import { resolveUserByTelegramId } from "@/services/identity";
 import { createTelegramSubmission } from "@/services/submissions/telegram-submissions";
+import { getTaskById } from "@/services/tasks";
 import type { BotContext, BotConversation } from "@/telegram/bot";
+import { eq } from "drizzle-orm";
 
 export async function submitProofConversation(
   conversation: BotConversation,
@@ -21,7 +25,22 @@ export async function submitProofConversation(
     return;
   }
 
-  await ctx.reply("Send a photo as proof for that task.");
+  const task = await conversation.external(() => getTaskById(taskId));
+
+  if (!task) {
+    await ctx.reply(
+      "That task could not be found. Please select another task.",
+    );
+    return;
+  }
+
+  await ctx.reply(
+    `*${task.title}*\n\n` +
+      `${task.description}\n\n` +
+      `Base points: ${task.basePoints}\n\n` +
+      `Send a photo as proof for that task.`,
+    { parse_mode: "Markdown" },
+  );
 
   const photoCtx = await conversation.waitFor("message:photo");
   const photo = photoCtx.message.photo.at(-1);

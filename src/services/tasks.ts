@@ -33,9 +33,6 @@ export async function getTaskById(taskId: string) {
     where: eq(tasks.id, taskId),
   });
 
-  if (!task) {
-    throw new Error(`Task with id ${taskId} not found`);
-  }
   return task;
 }
 

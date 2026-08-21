@@ -1,11 +1,10 @@
 // workers/notification.worker.ts
 import { Worker } from "bullmq";
 import { bot } from "@/telegram/bot";
-import { getTaskById } from "@/services/tasks";
 import { makeConnection } from "@/redis";
 import { participantProfile } from "@/db/schema/rail2";
 import { db } from "@/db";
-import { eq, isNotNull } from "drizzle-orm";
+import { isNotNull } from "drizzle-orm";
 
 export const taskNotificationWorker = new Worker(
   "task-notification",
