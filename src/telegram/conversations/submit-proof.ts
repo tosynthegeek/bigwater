@@ -38,7 +38,7 @@ export async function submitProofConversation(
     `*${task.title}*\n\n` +
       `${task.description}\n\n` +
       `Base points: ${task.basePoints}\n\n` +
-      `Send a photo as proof for that task.`,
+      `*Send a photo as proof for that task.*`,
     { parse_mode: "Markdown" },
   );
 
