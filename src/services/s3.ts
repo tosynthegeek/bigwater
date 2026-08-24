@@ -14,9 +14,15 @@ const STORAGE_DRIVER = Bun.env.STORAGE_DRIVER ?? "s3";
 const UPLOAD_DIR = Bun.env.UPLOAD_DIR ?? "./uploads";
 const PUBLIC_BASE_URL = Bun.env.PUBLIC_BASE_URL ?? "";
 
-export async function uploadFileToS3(imageFile: File) {
+export async function uploadFileToS3(
+  imageFile: File,
+  detectedExtension: string,
+  detectedMime: string,
+) {
   const key = uuid();
-  const extension = imageFile.type.split("/")[1];
+  // Use the caller-supplied, content-detected extension/mime — never derive
+  // them from `imageFile.type`, which is client-supplied and spoofable.
+  const extension = detectedExtension;
   const filename = `${key}.${extension}`;
 
   if (STORAGE_DRIVER === "local") {
@@ -30,7 +36,7 @@ export async function uploadFileToS3(imageFile: File) {
   const putObjectCommand = new PutObjectCommand({
     Bucket: AWS_BUCKET_NAME,
     Key: `${key}.${extension}`,
-    ContentType: imageFile.type,
+    ContentType: detectedMime,
     ContentEncoding: "base64",
     Body: object,
   });
