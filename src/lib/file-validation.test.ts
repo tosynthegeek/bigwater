@@ -48,12 +48,14 @@ describe("detectAndValidateImage", () => {
     if (result.ok) expect(result.mime).toBe("image/png");
   });
 
-  test("accepts a real GIF", async () => {
+  test("rejects a real GIF — GIF is intentionally not a supported format", async () => {
     const result = await detectAndValidateImage(
       makeFile(GIF_BYTES, "photo.gif", "image/gif"),
     );
-    expect(result.ok).toBe(true);
-    if (result.ok) expect(result.mime).toBe("image/gif");
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.reason).toContain("image/gif");
+    }
   });
 
   test("rejects a non-image file even when renamed and mislabeled as image/jpeg (the reported bug)", async () => {
@@ -105,13 +107,13 @@ describe("detectAndValidateImage", () => {
   // so a file with a valid image signature followed by other content still
   // passes here. Defeating true polyglots requires a decode/re-encode step
   // (tracked as a follow-up), not caught by this check.
-  test("documents the polyglot limitation: valid GIF header + trailing payload still passes", async () => {
+  test("documents the polyglot limitation: valid JPEG header + trailing payload still passes", async () => {
     const payload = new TextEncoder().encode("<script>alert(1)</script>");
-    const polyglot = new Uint8Array(GIF_BYTES.length + payload.length);
-    polyglot.set(GIF_BYTES, 0);
-    polyglot.set(payload, GIF_BYTES.length);
+    const polyglot = new Uint8Array(JPEG_BYTES.length + payload.length);
+    polyglot.set(JPEG_BYTES, 0);
+    polyglot.set(payload, JPEG_BYTES.length);
     const result = await detectAndValidateImage(
-      makeFile(polyglot, "polyglot.gif", "image/gif"),
+      makeFile(polyglot, "polyglot.jpg", "image/jpeg"),
     );
     expect(result.ok).toBe(true);
   });

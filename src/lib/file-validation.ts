@@ -9,13 +9,11 @@ import { fileTypeFromBuffer } from "file-type";
 //
 // Known limitation: signature sniffing only proves the file *starts* with a
 // valid image header — it does not defend against polyglots (e.g. a valid
-// GIF header followed by an embedded script). Defeating that requires
+// image header followed by an embedded script). Defeating that requires
 // decode-then-re-encode (e.g. via `sharp`), tracked as a follow-up.
-export const ALLOWED_IMAGE_MIME_TYPES = [
-  "image/jpeg",
-  "image/png",
-  "image/gif",
-] as const;
+//
+// GIF is intentionally not supported — product decision.
+export const ALLOWED_IMAGE_MIME_TYPES = ["image/jpeg", "image/png"] as const;
 
 export const MAX_IMAGE_SIZE_BYTES = 1 * 1024 * 1024; // 1MB, matches the product limit
 
@@ -54,7 +52,7 @@ export async function detectAndValidateImage(
   ) {
     return {
       ok: false,
-      reason: `This file's content is actually ${detected.mime} (.${detected.ext}), not JPEG, PNG, or GIF. Please convert it or choose a different photo.`,
+      reason: `This file's content is actually ${detected.mime} (.${detected.ext}), not JPEG or PNG. Please convert it or choose a different photo.`,
     };
   }
 
