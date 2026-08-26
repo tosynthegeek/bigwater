@@ -28,7 +28,9 @@ export async function submitProofConversation(
 
   if (!task) {
     await ctx.reply(
-      "That task could not be found. Please select another task.",
+      "That task could not be found. Please select another task " +
+        "or send /cancel to stop." +
+        "Send /help if you need help.",
     );
     return;
   }
@@ -52,7 +54,12 @@ export async function submitProofConversation(
   const photo = photoCtx.message?.photo?.at(-1);
 
   if (!photo?.file_id) {
-    await ctx.reply("I couldn't read the photo. Try sending it again.");
+    await ctx.reply(
+      "I don't understand that message.\n\n" +
+        "Please send a JPEG or PNG photo as proof, " +
+        "or send /cancel to stop.\n\n" +
+        "Send /help if you need help.",
+    );
     return;
   }
 

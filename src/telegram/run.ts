@@ -9,6 +9,7 @@ import { registerSubmissionsHandlers } from "./handlers/submissions";
 import { registerScoreHandler } from "./handlers/score";
 import { registerHelpHandler } from "./handlers/help";
 import { registerCancelHandler } from "./handlers/cancel";
+import { registerFallbackHandler } from "./handlers/fallback";
 
 let started = false;
 
@@ -36,6 +37,8 @@ export function startTelegramBot() {
   registerScoreHandler(bot);
   registerHelpHandler(bot);
   registerCancelHandler(bot);
+
+  registerFallbackHandler(bot);
 
   bot.catch((err) => {
     console.error("Telegram.Bot.handler.error: ", err);
