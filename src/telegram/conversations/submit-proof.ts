@@ -1,10 +1,9 @@
-import { db } from "@/db";
-import { tasks } from "@/db/schema/rail2";
 import { resolveUserByTelegramId } from "@/services/identity";
 import { createTelegramSubmission } from "@/services/submissions/telegram-submissions";
 import { getTaskById } from "@/services/tasks";
 import type { BotContext, BotConversation } from "@/telegram/bot";
-import { eq } from "drizzle-orm";
+import { getTelegramPhotoFile } from "../handlers/photo";
+import { detectAndValidateImage } from "@/lib/file-validation";
 
 export async function submitProofConversation(
   conversation: BotConversation,
@@ -42,8 +41,14 @@ export async function submitProofConversation(
     { parse_mode: "Markdown" },
   );
 
-  const photoCtx = await conversation.waitFor("message:photo");
-  const photo = photoCtx.message.photo.at(-1);
+  const photoCtx = await conversation.wait();
+
+  if (photoCtx.message?.text?.trim().toLowerCase() === "/cancel") {
+    await ctx.reply("Submission cancelled. You can start again with /tasks.");
+    return;
+  }
+
+  const photo = photoCtx.message?.photo?.at(-1);
 
   if (!photo?.file_id) {
     await ctx.reply("I couldn't read the photo. Try sending it again.");
@@ -51,8 +56,20 @@ export async function submitProofConversation(
   }
 
   try {
+    const file = await getTelegramPhotoFile(photo?.file_id);
+
+    const validation = await detectAndValidateImage(file);
+
+    if (!validation.ok) {
+      await ctx.reply(
+        `${validation.reason}\n\n` +
+          `Send a JPEG or PNG image (max 1MB) to submit as proof, or send /cancel to cancel this submission.`,
+      );
+      return;
+    }
+
     const result = await conversation.external(() =>
-      createTelegramSubmission(photo.file_id, user.id, taskId),
+      createTelegramSubmission(file, user.id, taskId),
     );
 
     if (!result.ok) {

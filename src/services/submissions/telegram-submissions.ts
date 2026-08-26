@@ -1,15 +1,12 @@
 import { createSubmission } from "@/services/submissions/submissions";
-import { getTelegramPhotoFile } from "@/telegram/handlers/photo";
 import { submissionEvaluationQueue } from "../queues/evaluation.queue";
 import { SubmissionRejectedError } from "@/utils/errors";
 
 export async function createTelegramSubmission(
-  fileId: string,
+  file: File,
   userId: string,
   taskId: string,
 ) {
-  const file = await getTelegramPhotoFile(fileId);
-
   try {
     const { submission, task } = await createSubmission(
       userId,
