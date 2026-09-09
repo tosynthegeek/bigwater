@@ -184,3 +184,16 @@ export async function runStreakBreakSweep() {
     .set({ currentStreak: 0, updatedAt: now })
     .where(inArray(userStreaks.userId, toBreak));
 }
+
+export async function getUserStreak(userId: string) {
+  const streak = await db.query.userStreaks.findFirst({
+    where: eq(userStreaks.userId, userId),
+    columns: {
+      currentStreak: true,
+    },
+  });
+
+  const currentStreak = streak?.currentStreak ?? 0;
+
+  return currentStreak;
+}

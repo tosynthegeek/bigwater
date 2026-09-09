@@ -5,6 +5,7 @@ import type { BotContext } from "@/telegram/bot";
 import { getActiveTasks } from "@/services/tasks";
 import { resolveUserByTelegramId } from "@/services/identity";
 import { getSubmissionLimitStatus } from "@/services/submissions/submission-limits";
+import { getUserStreak } from "@/services/economy/streaks";
 
 export async function sendActiveTaskList(ctx: BotContext) {
   const telegramUserId = ctx.from?.id.toString();
@@ -30,11 +31,20 @@ export async function sendActiveTaskList(ctx: BotContext) {
   }
 
   if (status.availableTasks.length === 0) {
-    await ctx.reply(
-      header +
-        "\nNo tasks available right now. Try again later or after the cooldown resets.",
-      { parse_mode: "Markdown" },
-    );
+    const streak = await getUserStreak(user.id);
+    let message: string;
+    if (streak >= 3) {
+      message =
+        `${header}\n` +
+        `Full house, again. Day ${streak} and counting.\n` +
+        `Rest up, tomorrow’s tasks will be waiting.`;
+    } else {
+      message =
+        `${header}\n` +
+        `That’s a wrap for today. Everything’s in for review, and your limit resets in 24 hours.\n` +
+        `See you tomorrow. Your streak will thank you 🔥`;
+    }
+    await ctx.reply(message, { parse_mode: "Markdown" });
     return;
   }
 
