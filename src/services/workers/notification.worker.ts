@@ -40,9 +40,6 @@ export const notificationWorker = new Worker(
     let points = task.basePoints;
     let message: string;
 
-    let points = task.basePoints;
-    let message: string;
-
     if (status === "approved") {
       if (isFirstApprovedSubmission) {
         message =
