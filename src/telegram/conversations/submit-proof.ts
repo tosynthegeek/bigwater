@@ -57,9 +57,9 @@ export async function submitProofConversation(
 
   if (!photo?.file_id) {
     await ctx.reply(
-      "I don't understand that message.\n\n" +
-        "Please send a JPEG or PNG photo as proof, " +
-        "or send /cancel to stop.\n\n" +
+      "That file won’t work here.\n\n" +
+        "Proof needs to be a photo: JPEG or PNG, " +
+        "Send it again or send /cancel to step out." +
         "Send /help if you need help.",
     );
     return;
