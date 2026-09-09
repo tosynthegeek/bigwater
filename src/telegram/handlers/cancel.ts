@@ -7,8 +7,8 @@ export function registerCancelHandler(bot: Bot<BotContext>) {
     await ctx.conversation.exitAll();
 
     await ctx.reply(
-      "Cancelled. Any active conversation has been stopped.\n\n" +
-        "You can start again whenever you're ready.",
+      "Cancelled, clean slate. Nothing was submitted.\n\n" +
+        "/task whenever you're ready.",
     );
   });
 }
