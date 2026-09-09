@@ -64,8 +64,9 @@ export function registerStartHandler(bot: Bot<BotContext>) {
     }
 
     await ctx.reply(
-      "You're linked! 🎉\n\n" +
-        "Send /tasks to see what you can submit today, or /help for all commands.",
+      `Hey ${username}👋 Welcome to BigWater\n\n` +
+        "Here's how this works: pick a task, do it in real life, send one photo as proof. A real person checks it, and your Sustainability Score goes up. It never comes back down.\n\n" +
+        "Send /tasks to see what you can submit today, or /help for the full menu.",
     );
     await sendActiveTaskList(ctx);
   });
