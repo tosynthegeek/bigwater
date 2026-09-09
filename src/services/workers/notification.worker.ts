@@ -11,7 +11,7 @@ import { InlineKeyboard } from "grammy";
 export const notificationWorker = new Worker(
   "submission-notification",
   async (job) => {
-    const { userId, taskId, status } = job.data;
+    const { userId, taskId, status, isFirstApprovedSubmission } = job.data;
 
     const user = await db.query.participantProfile.findFirst({
       where: eq(participantProfile.userId, userId),
@@ -31,10 +31,24 @@ export const notificationWorker = new Worker(
       return;
     }
 
-    const message =
-      status === "approved"
-        ? `✅ Your submission for ${task.title} was approved!`
-        : `❌ Your submission for ${task.title} was rejected.`;
+    let points = task.basePoints;
+    let message: string;
+
+    if (status === "approved") {
+      if (isFirstApprovedSubmission) {
+        message =
+          `✅ Your first approval. Welcome to the record.\n\n` +
+          `+${points} points on your Sustainability Score, and here's the best part: it never drops.\n\n` +
+          `/score to see it. /tasks for the next one.`;
+      } else {
+        message =
+          `✅ Approved: ${task.title}\n\n` +
+          `+${points} points, locked in for good.\n\n` +
+          `/tasks for your next one, or /score to admire the numbers.`;
+      }
+    } else {
+      message = `❌ Your submission for ${task.title} was rejected.`;
+    }
 
     const replyMarkup =
       status === "rejected"

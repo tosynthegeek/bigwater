@@ -8,7 +8,7 @@ import {
   tasks,
   type User,
 } from "@/db/schema/rail2";
-import { desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, ne } from "drizzle-orm";
 import { updateUserStreak } from "@/services/economy/streaks";
 import { rail1Users } from "@/db/schema/rail1";
 import { relevanceRes } from "@/services/ai/relevance";
@@ -91,12 +91,27 @@ export async function reviewSubmission(c: Context) {
         throw new Error("Failed to update submission status");
       }
 
+      const previousApprovedSubmission = await tx.query.submissions.findFirst({
+        where: and(
+          eq(submissions.userId, submission.userId),
+          eq(submissions.status, "approved"),
+          ne(submissions.id, submission.id),
+        ),
+        columns: {
+          id: true,
+        },
+      });
+
+      const isFirstApprovedSubmission =
+        previousApprovedSubmission === undefined;
+
       await submissionNotificationQueue.add(
         "notify",
         {
           userId: updatedSubmission.userId,
           taskId: updatedSubmission.taskId,
           status: updatedSubmission.status,
+          isFirstApprovedSubmission,
         },
         { jobId: `notify-${updatedSubmission.id}` },
       );
