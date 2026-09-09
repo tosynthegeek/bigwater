@@ -11,7 +11,13 @@ import { InlineKeyboard } from "grammy";
 export const notificationWorker = new Worker(
   "submission-notification",
   async (job) => {
-    const { userId, taskId, status, isFirstApprovedSubmission } = job.data;
+    const {
+      userId,
+      taskId,
+      status,
+      isFirstSubmission,
+      isFirstApprovedSubmission,
+    } = job.data;
 
     const user = await db.query.participantProfile.findFirst({
       where: eq(participantProfile.userId, userId),
@@ -34,6 +40,9 @@ export const notificationWorker = new Worker(
     let points = task.basePoints;
     let message: string;
 
+    let points = task.basePoints;
+    let message: string;
+
     if (status === "approved") {
       if (isFirstApprovedSubmission) {
         message =
@@ -46,8 +55,18 @@ export const notificationWorker = new Worker(
           `+${points} points, locked in for good.\n\n` +
           `/tasks for your next one, or /score to admire the numbers.`;
       }
+    } else if (isFirstSubmission) {
+      message =
+        `❌ This one didn’t make it. Happens to the best of us.\n\n` +
+        `Nine times out of ten it means the photo didn’t clearly show the task done. ` +
+        `Your Score is untouched, and the task is still open.\n\n` +
+        `Tap Resubmit and send a clearer shot.`;
     } else {
-      message = `❌ Your submission for ${task.title} was rejected.`;
+      message =
+        `❌ Not this time either.\n\n` +
+        `Quick tip: get the whole task in frame, in decent light. ` +
+        `The reviewer can only approve what they can see.\n\n` +
+        `Resubmit whenever you’re ready.`;
     }
 
     const replyMarkup =

@@ -105,12 +105,25 @@ export async function reviewSubmission(c: Context) {
       const isFirstApprovedSubmission =
         previousApprovedSubmission === undefined;
 
+      const previousSubmission = await tx.query.submissions.findFirst({
+        where: and(
+          eq(submissions.userId, submission.userId),
+          ne(submissions.id, submission.id),
+        ),
+        columns: {
+          id: true,
+        },
+      });
+
+      const isFirstSubmission = previousSubmission === undefined;
+
       await submissionNotificationQueue.add(
         "notify",
         {
           userId: updatedSubmission.userId,
           taskId: updatedSubmission.taskId,
           status: updatedSubmission.status,
+          isFirstSubmission,
           isFirstApprovedSubmission,
         },
         { jobId: `notify-${updatedSubmission.id}` },

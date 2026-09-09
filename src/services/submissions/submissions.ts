@@ -1,6 +1,6 @@
 import { db } from "@/db";
 import { submissions, tasks } from "@/db/schema/rail2";
-import { and, desc, eq } from "drizzle-orm";
+import { and, desc, eq, ne } from "drizzle-orm";
 import { uploadFileToS3 } from "@/services/s3";
 import { SubmissionRejectedError } from "@/utils/errors";
 import { enforceSubmissionLimits } from "./submission-limits";
@@ -114,13 +114,19 @@ export async function getUserSubmissionsWithStatus(
   }));
 }
 
-export async function isUserFirstSubmission(userId: string) {
-  const submission = await db.query.submissions.findFirst({
-    where: eq(submissions.userId, userId),
+export async function isUserFirstSubmission(
+  userId: string,
+  submissionId: string,
+) {
+  const previousSubmission = await db.query.submissions.findFirst({
+    where: and(
+      eq(submissions.userId, userId),
+      ne(submissions.id, submissionId),
+    ),
     columns: {
       id: true,
     },
   });
 
-  return submission === undefined;
+  return previousSubmission === undefined;
 }

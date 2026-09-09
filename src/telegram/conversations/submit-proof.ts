@@ -88,7 +88,9 @@ export async function submitProofConversation(
     }
 
     const isFirstSubmission = await conversation.external(() =>
-      result.submission ? isUserFirstSubmission(user.id) : false,
+      result.submission
+        ? isUserFirstSubmission(user.id, result.submission.id)
+        : false,
     );
 
     const status = await getSubmissionLimitStatus(user.id);
