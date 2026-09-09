@@ -4,6 +4,8 @@ import { getTaskById } from "@/services/tasks";
 import type { BotContext, BotConversation } from "@/telegram/bot";
 import { getTelegramPhotoFile } from "../handlers/photo";
 import { detectAndValidateImage } from "@/lib/file-validation";
+import { isUserFirstSubmission } from "@/services/submissions/submissions";
+import { getSubmissionLimitStatus } from "@/services/submissions/submission-limits";
 
 export async function submitProofConversation(
   conversation: BotConversation,
@@ -85,9 +87,28 @@ export async function submitProofConversation(
       return;
     }
 
+    const isFirstSubmission = await conversation.external(() =>
+      result.submission ? isUserFirstSubmission(user.id) : false,
+    );
+
+    const status = await getSubmissionLimitStatus(user.id);
+    const remaining = Math.max(
+      0,
+      status.today.submissionsLimit - status.today.submissionsUsed,
+    );
+
+    if (isFirstSubmission) {
+      await ctx.reply(
+        "That’s your first proof in 🌊\n\n" +
+          "It’s off to a real human for review, so give it a little time. We’ll ping you the moment there’s a verdict.\n\n" +
+          `Meanwhile, you’ve still got ${remaining} submissions today. Send /tasks if you’re on a roll, or /help for the full menu.`,
+      );
+      return;
+    }
+
     await ctx.reply(
-      "Got your photo! Submission is queued for verification. You'll be notified once it's processed.\n\n" +
-        "Send /tasks to see what else you can submit today, or /help for all commands.",
+      "Photo’s in 🌊 Off to review it goes.\n\n" +
+        `We’ll message you the verdict. ${remaining} left today, send /tasks to keep the streak alive, or /help for the full menu.`,
     );
   } catch (error) {
     console.error("Error creating submission:", error);

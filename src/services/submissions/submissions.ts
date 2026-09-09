@@ -113,3 +113,14 @@ export async function getUserSubmissionsWithStatus(
     basePoints: basePoints ?? 0,
   }));
 }
+
+export async function isUserFirstSubmission(userId: string) {
+  const submission = await db.query.submissions.findFirst({
+    where: eq(submissions.userId, userId),
+    columns: {
+      id: true,
+    },
+  });
+
+  return submission === undefined;
+}
