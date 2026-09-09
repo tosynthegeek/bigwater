@@ -5,6 +5,7 @@ import {
   resolveUserByTelegramId,
 } from "@/services/identity";
 import { sendActiveTaskList } from "./tasks";
+import { getSubmissionLimitStatus } from "@/services/submissions/submission-limits";
 
 export function registerStartHandler(bot: Bot<BotContext>) {
   bot.command("start", async (ctx) => {
@@ -27,10 +28,16 @@ export function registerStartHandler(bot: Bot<BotContext>) {
     const existingUser = await resolveUserByTelegramId(telegramUserId);
 
     if (existingUser) {
+      const status = await getSubmissionLimitStatus(existingUser.id);
+      const remaining = Math.max(
+        0,
+        status.today.submissionsLimit - status.today.submissionsUsed,
+      );
+
       await ctx.reply(
-        "Welcome back! 👋\n\n" +
-          "Your Telegram account is already linked to BigWater.\n\n" +
-          "Send /tasks to see what you can submit today, or /help for all commands.",
+        `Welcome back, ${existingUser.username}! 👋\n\n` +
+          `You've got ${remaining} submissions left today, and every approved one grows your score for good.\n\n` +
+          "Pick a task below, or /help for the full menu.",
       );
 
       await sendActiveTaskList(ctx);

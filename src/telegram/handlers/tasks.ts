@@ -43,7 +43,7 @@ export async function sendActiveTaskList(ctx: BotContext) {
     keyboard.text(task.title, `task:${task.id}`).row();
   }
 
-  await ctx.reply(header + "\nSelect a task:", {
+  await ctx.reply(header + "\nWhat good are we doing today? Pick one:", {
     parse_mode: "Markdown",
     reply_markup: keyboard,
   });
