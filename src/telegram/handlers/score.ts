@@ -26,14 +26,14 @@ export function registerScoreHandler(bot: Bot<BotContext>) {
 
     await ctx.reply(
       `🌱 *Sustainability Score*: ${summary.totalScore}\n` +
-        `   Rail 2: ${summary.rail2score} · Rail 1: ${summary.rail1score}\n` +
         `🔥 *Streak*: ${summary.currentStreak ?? 0} (best ${summary.longestStreak ?? 0})\n` +
         `📅 *This month*: ${summary.monthlyTally ?? 0} pts — ${summary.currentBand} (×${multiplier.toFixed(1)})\n` +
-        `🏆 Rank: #${summary.globalRank ?? "—"}`,
+        `🏆 Rank: #${summary.globalRank ?? "—"}\n` +
+        `\n Every point you’ve earned stays earned. The Score never drops.`,
       {
         parse_mode: "Markdown",
         reply_markup: new InlineKeyboard().text(
-          "📋 View submissions",
+          "📋 My submissions",
           "submissions:menu",
         ),
       },

@@ -30,6 +30,8 @@ export function registerLimitsHandler(bot: Bot<BotContext>) {
       text += `\n⏳ Cooldown active — next submission available in ~${mins}m`;
     }
 
+    text += `\n\n Everything resets every 24 hours.`;
+
     await ctx.reply(text);
   });
 }

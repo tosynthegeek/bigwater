@@ -8,7 +8,7 @@ import { getUserSubmissionsWithStatus } from "@/services/submissions/submissions
 const STATUS_LABEL = {
   approved: "✅ Approved",
   rejected: "❌ Rejected",
-  pending: "⏳ Pending",
+  pending: "🕐 Pending",
   under_review: "⏳ Reviewing",
 } as const;
 
@@ -22,8 +22,10 @@ export function registerSubmissionsHandlers(bot: Bot<BotContext>) {
       .row()
       .text("⏳ Under Review", "submissions:under_review")
       .row()
-      .text("⏳ Pending", "submissions:pending");
-    await ctx.reply("Which submissions?", { reply_markup: keyboard });
+      .text("🕐 Pending", "submissions:pending");
+    await ctx.reply("Your track record. Which pile do you want to see?", {
+      reply_markup: keyboard,
+    });
   });
 
   bot.callbackQuery(
@@ -42,9 +44,22 @@ export function registerSubmissionsHandlers(bot: Bot<BotContext>) {
 
       const subs = await getUserSubmissionsWithStatus(user.id, status);
       if (subs.length === 0) {
-        await ctx.reply("Nothing here yet.");
+        await ctx.reply(
+          "Nothing here yet. Finish a task, send the proof, and this list starts filling up. /tasks",
+        );
         return;
       }
+
+      const count = subs.length;
+
+      const header =
+        status === "approved"
+          ? `✅ Approved · ${count}. On the record, permanently:`
+          : status === "rejected"
+            ? `❌ Rejected · ${count}. All of these can be redone:`
+            : status === "under_review"
+              ? `⏳ In review · ${count}. A reviewer has these, nothing needed from you:`
+              : `🕐 Pending · ${count}. These are waiting to be reviewed:`;
 
       const text = subs
         .slice(0, 10)
@@ -53,7 +68,8 @@ export function registerSubmissionsHandlers(bot: Bot<BotContext>) {
             `${STATUS_LABEL[status]} ${s.taskTitle ?? "Unknown task"} — ${s.createdAt.toLocaleDateString()}`,
         )
         .join("\n");
-      await ctx.reply(text);
+
+      await ctx.reply(`${header}\n\n${text}`);
     },
   );
 }
