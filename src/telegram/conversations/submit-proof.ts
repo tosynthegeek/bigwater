@@ -38,9 +38,9 @@ export async function submitProofConversation(
   }
 
   await ctx.reply(
-    `*${task.title}*\n\n` +
+    `🌍 *${task.title}*\n\n` +
       `${task.description}\n\n` +
-      `Worth: ${task.basePoints}\n\n` +
+      `Worth: ${task.basePoints} points \n\n` +
       `*Done? Send one photo that clearly shows the work. The reviewer goes by what they can see, so get the whole thing in frame.*\n\n` +
       `Changed your mind? /cancel anytime, no hard feelings.`,
     { parse_mode: "Markdown" },
