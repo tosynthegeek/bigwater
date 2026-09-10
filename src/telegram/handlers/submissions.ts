@@ -9,7 +9,7 @@ const STATUS_LABEL = {
   approved: "✅ Approved",
   rejected: "❌ Rejected",
   pending: "🕐 Pending",
-  under_review: "⏳ Reviewing",
+  under_review: "⏳ In Review",
 } as const;
 
 export function registerSubmissionsHandlers(bot: Bot<BotContext>) {
@@ -20,7 +20,7 @@ export function registerSubmissionsHandlers(bot: Bot<BotContext>) {
       .row()
       .text("❌ Rejected", "submissions:rejected")
       .row()
-      .text("⏳ Under Review", "submissions:under_review")
+      .text("⏳ In Review", "submissions:in_review")
       .row()
       .text("🕐 Pending", "submissions:pending");
     await ctx.reply("Your track record. Which pile do you want to see?", {
