@@ -56,7 +56,7 @@ export async function sendActiveTaskList(ctx: BotContext) {
   const prompt =
     remaining === 1
       ? "Last one of the day. Make it count:"
-      : `${remaining} more chances to do something good today. Pick one:`;
+      : `What good are we doing today? Pick one:`;
 
   await ctx.reply(header + `\n${prompt}`, {
     parse_mode: "Markdown",
