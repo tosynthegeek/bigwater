@@ -35,7 +35,7 @@ export function registerStartHandler(bot: Bot<BotContext>) {
       );
 
       await ctx.reply(
-        `Welcome back, ${existingUser.username}! 👋\n\n` +
+        `Welcome back, ${username}! 👋\n\n` +
           `You've got ${remaining} submissions left today, and every approved one grows your score for good.\n\n` +
           "Pick a task below, or /help for the full menu.",
       );
