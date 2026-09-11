@@ -20,7 +20,7 @@ export function registerSubmissionsHandlers(bot: Bot<BotContext>) {
       .row()
       .text("❌ Rejected", "submissions:rejected")
       .row()
-      .text("⏳ In Review", "submissions:in_review")
+      .text("⏳ In Review", "submissions:under_review")
       .row()
       .text("🕐 Pending", "submissions:pending");
     await ctx.reply("Your track record. Which pile do you want to see?", {
