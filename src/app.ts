@@ -22,6 +22,34 @@ import { adminLogin } from "./api/controllers/admin/admin-controllers";
 
 const app = new Hono();
 
+/**
+ * ---------------------------------------------------------------------------
+ * Request logging
+ * ---------------------------------------------------------------------------
+ *
+ * Hono's logger middleware provides basic request logging.
+ *
+ * A request ID is also attached to every request so that application logs,
+ * provider errors and API responses can be correlated.
+ *
+ * If a caller supplies X-Request-ID we preserve it. Otherwise we generate one.
+ */
+app.use(
+  "*",
+  createMiddleware(async (c, next) => {
+    const incomingRequestId = c.req.header("X-Request-ID");
+
+    const requestId =
+      incomingRequestId && incomingRequestId.trim().length > 0
+        ? incomingRequestId.trim()
+        : crypto.randomUUID();
+
+    c.header("X-Request-ID", requestId);
+
+    await next();
+  }),
+);
+
 app.use(logger());
 
 app.use(
@@ -29,6 +57,7 @@ app.use(
   createMiddleware(async (c, next) => {
     c.res.headers.set("X-Robots-Tag", "noindex, nofollow");
     c.res.headers.set("X-Content-Type-Options", "nosniff");
+    
     c.res.headers.set(
       "Strict-Transport-Security",
       "max-age=31536000; includeSubDomains",
@@ -110,5 +139,23 @@ app.use("/internal/*", requireServiceAuth);
 
 app.route("/api", ApiRouter);
 app.route("/internal", InternalRouter);
+
+// === OpenAPI / Swagger UI (staging & local only) ===
+// This block is completely additive and will never run in production.
+if (Bun.env.NODE_ENV !== "production") {
+  const { swaggerUI } = await import("@hono/swagger-ui");
+  const { openApiDocument } = await import("./openapi");
+
+  // Raw OpenAPI JSON
+  app.get("/openapi.json", (c) => c.json(openApiDocument));
+
+  // Interactive Swagger UI
+  app.get(
+    "/docs",
+    swaggerUI({
+      url: "/openapi.json",
+    }),
+  );
+}
 
 export default app;
