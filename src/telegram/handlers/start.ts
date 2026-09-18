@@ -28,6 +28,15 @@ export function registerStartHandler(bot: Bot<BotContext>) {
     const existingUser = await resolveUserByTelegramId(telegramUserId);
 
     if (existingUser) {
+      if (code) {
+        await ctx.reply(
+          `👋 This Telegram account is already connected to BigWater.\n\n` +
+            `There's nothing else you need to link. Your existing account is safe and ready to go.\n\n` +
+            `Use /tasks to find your next task, /score to check your Sustainability Score, or /help to see everything I can do.`,
+        );
+
+        return;
+      }
       const status = await getSubmissionLimitStatus(existingUser.id);
       const remaining = Math.max(
         0,
