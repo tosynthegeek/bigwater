@@ -3,6 +3,28 @@ import { runSeeds } from "@/db/seed";
 import { privy } from "@/privy";
 import { startQueues, stopQueues } from "@/services/queues";
 import parseEnv from "@/zod/env";
+import { sendCriticalAlert } from "@/utils/alerts";
+
+// Last-resort net: anything that escapes every try/catch and every worker's
+// own "failed"/"error" handler lands here. uncaughtException means the
+// process is in an unknown state, so we alert then exit — Railway/PM2 will
+// restart it. unhandledRejection is logged/alerted but not fatal by itself,
+// matching Bun's default (non-crashing) behavior for it.
+process.on("uncaughtException", (err) => {
+  void sendCriticalAlert({
+    source: "process:uncaughtException",
+    message: "uncaught exception — process will exit",
+    error: err,
+  }).finally(() => process.exit(1));
+});
+
+process.on("unhandledRejection", (reason) => {
+  void sendCriticalAlert({
+    source: "process:unhandledRejection",
+    message: "unhandled promise rejection",
+    error: reason,
+  });
+});
 
 parseEnv();
 await runSeeds();

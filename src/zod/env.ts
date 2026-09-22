@@ -48,6 +48,10 @@ const envSchema = z.object({
   SIGHTENGINE_SECRET: z.string(),
 
   ADMIN_SESSION_SECRET: z.string(),
+
+  RESEND_API_KEY: z.string().optional(),
+  ALERT_EMAIL_FROM: z.string().optional(),
+  ALERT_EMAIL_TO: z.string().optional(),
 });
 
 export default function parseEnv() {

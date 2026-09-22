@@ -5,6 +5,7 @@ import { makeConnection } from "@/redis";
 import { participantProfile } from "@/db/schema/rail2";
 import { db } from "@/db";
 import { isNotNull } from "drizzle-orm";
+import { wireWorkerAlerts } from "@/utils/alerts";
 
 export const taskNotificationWorker = new Worker(
   "task-notification",
@@ -57,3 +58,5 @@ taskNotificationWorker.on("completed", (job) => {
 taskNotificationWorker.on("error", (err) => {
   console.error("task-notification worker error", err);
 });
+
+wireWorkerAlerts(taskNotificationWorker, "worker:task-notification");

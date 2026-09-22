@@ -1,6 +1,7 @@
 import { Worker, type Job } from "bullmq";
 import { db } from "@/db";
 import { makeConnection } from "@/redis";
+import { wireWorkerAlerts } from "@/utils/alerts";
 import { bankMonthlyScoreForUser } from "../economy/score";
 import {
   bankingQueue,
@@ -71,6 +72,13 @@ bankingWorker.on("failed", (job, err) => {
     err,
   );
 });
+
+// Banking moves points from "pending" into a user's locked-in Sustainability
+// Score — the one subsystem in rail2 that resembles a ledger. A stuck sweep
+// (nothing gets queued) or a job that exhausts retries (a user's month never
+// gets banked) are exactly the kind of silent failure email alerts are for.
+wireWorkerAlerts(bankingSweepWorker, "worker:banking-sweep");
+wireWorkerAlerts(bankingWorker, "worker:banking");
 
 bankingQueueEvents.on("completed", ({ jobId }) => {
   console.log(`[banking] Job completed: ${jobId}`);

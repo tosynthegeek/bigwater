@@ -7,6 +7,7 @@ import { makeConnection } from "@/redis";
 import { db } from "@/db";
 import { participantProfile } from "@/db/schema/rail2";
 import { isNotNull } from "drizzle-orm";
+import { wireWorkerAlerts } from "@/utils/alerts";
 
 export const telegramMarketingWorker = new Worker(
   "telegram-marketing",
@@ -114,3 +115,5 @@ telegramMarketingWorker.on("failed", (job, error) => {
 telegramMarketingWorker.on("error", (error) => {
   console.error("[telegram-marketing] worker error:", error);
 });
+
+wireWorkerAlerts(telegramMarketingWorker, "worker:telegram-marketing");

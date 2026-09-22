@@ -6,6 +6,7 @@ import { createMiddleware } from "hono/factory";
 
 import { sql } from "drizzle-orm";
 import { db } from "@/db";
+import { sendCriticalAlert } from "@/utils/alerts";
 
 import {
   privyAuth,
@@ -57,7 +58,7 @@ app.use(
   createMiddleware(async (c, next) => {
     c.res.headers.set("X-Robots-Tag", "noindex, nofollow");
     c.res.headers.set("X-Content-Type-Options", "nosniff");
-    
+
     c.res.headers.set(
       "Strict-Transport-Security",
       "max-age=31536000; includeSubDomains",
@@ -105,7 +106,12 @@ app.get("/health", async (c) => {
   try {
     await db.execute(sql`SELECT 1`);
     return c.text("OK");
-  } catch {
+  } catch (err) {
+    void sendCriticalAlert({
+      source: "health:db",
+      message: "GET /health — database unreachable",
+      error: err,
+    });
     return c.text("Database unavailable", 500);
   }
 });

@@ -2,6 +2,7 @@ import { makeConnection } from "@/redis";
 import { runStreakBreakSweep } from "../economy/streaks";
 import type { SweepJobData } from "../queues/banking.queue";
 import { Worker } from "bullmq";
+import { wireWorkerAlerts } from "@/utils/alerts";
 
 export const streakSweepWorker = new Worker<SweepJobData>(
   "streak-sweep",
@@ -20,3 +21,5 @@ streakSweepWorker.on("completed", (job) => {
 streakSweepWorker.on("error", (err) => {
   console.error("streak-sweep worker error", err);
 });
+
+wireWorkerAlerts(streakSweepWorker, "worker:streak-sweep");

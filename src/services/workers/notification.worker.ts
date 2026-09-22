@@ -7,6 +7,7 @@ import { participantProfile } from "@/db/schema/rail2";
 import { db } from "@/db";
 import { eq } from "drizzle-orm";
 import { InlineKeyboard } from "grammy";
+import { wireWorkerAlerts } from "@/utils/alerts";
 
 export const notificationWorker = new Worker(
   "submission-notification",
@@ -87,3 +88,5 @@ notificationWorker.on("completed", (job) => {
 notificationWorker.on("error", (err) => {
   console.error("submission-notification worker error", err);
 });
+
+wireWorkerAlerts(notificationWorker, "worker:submission-notification");
