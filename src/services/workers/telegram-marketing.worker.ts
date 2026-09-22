@@ -8,6 +8,9 @@ import { db } from "@/db";
 import { participantProfile } from "@/db/schema/rail2";
 import { isNotNull } from "drizzle-orm";
 import { wireWorkerAlerts } from "@/utils/alerts";
+import { logger } from "@/utils/logger";
+
+const log = logger.child({ source: "worker:telegram-marketing" });
 
 export const telegramMarketingWorker = new Worker(
   "telegram-marketing",
@@ -20,7 +23,7 @@ export const telegramMarketingWorker = new Worker(
       imagePath?: string;
     } = job.data;
 
-    console.log(`[telegram-marketing] starting broadcast job=${job.id}`);
+    log.info("starting broadcast", { jobId: job.id });
 
     const users = await db
       .select({
@@ -29,9 +32,7 @@ export const telegramMarketingWorker = new Worker(
       .from(participantProfile)
       .where(isNotNull(participantProfile.telegramId));
 
-    console.log(
-      `[telegram-marketing] sending to ${users.length} Telegram users`,
-    );
+    log.info("broadcasting to Telegram users", { recipients: users.length });
 
     let sent = 0;
     let failed = 0;
@@ -63,10 +64,10 @@ export const telegramMarketingWorker = new Worker(
       } catch (error) {
         failed++;
 
-        console.error(
-          `[telegram-marketing] failed telegramId=${user.telegramId}`,
-          error,
-        );
+        log.error("failed to send to Telegram user", {
+          telegramId: user.telegramId,
+          err: error,
+        });
       }
     }
 
@@ -74,16 +75,14 @@ export const telegramMarketingWorker = new Worker(
       try {
         await unlink(imagePath);
       } catch (error) {
-        console.error(
-          `[telegram-marketing] failed to remove temporary image ${imagePath}`,
-          error,
-        );
+        log.error("failed to remove temporary image", {
+          imagePath,
+          err: error,
+        });
       }
     }
 
-    console.log(
-      `[telegram-marketing] completed job=${job.id} sent=${sent} failed=${failed}`,
-    );
+    log.info("broadcast complete", { jobId: job.id, sent, failed });
 
     return {
       total: users.length,
@@ -97,23 +96,23 @@ export const telegramMarketingWorker = new Worker(
 );
 
 telegramMarketingWorker.on("ready", () => {
-  console.log("[telegram-marketing] worker ready");
+  log.info("worker ready");
 });
 
 telegramMarketingWorker.on("active", (job) => {
-  console.log(`[telegram-marketing] active job=${job.id}`);
+  log.debug("job active", { jobId: job.id });
 });
 
 telegramMarketingWorker.on("completed", (job) => {
-  console.log(`[telegram-marketing] completed job=${job.id}`);
+  log.info("job completed", { jobId: job.id });
 });
 
 telegramMarketingWorker.on("failed", (job, error) => {
-  console.error(`[telegram-marketing] failed job=${job?.id}:`, error);
+  log.error("job failed", { jobId: job?.id, err: error });
 });
 
 telegramMarketingWorker.on("error", (error) => {
-  console.error("[telegram-marketing] worker error:", error);
+  log.error("worker-level error", { err: error });
 });
 
 wireWorkerAlerts(telegramMarketingWorker, "worker:telegram-marketing");

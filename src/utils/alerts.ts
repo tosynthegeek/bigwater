@@ -1,6 +1,9 @@
 import { Resend } from "resend";
 import type { Worker } from "bullmq";
 import redisClient from "@/redis";
+import { logger } from "@/utils/logger";
+
+const log = logger.child({ source: "alerts" });
 
 const resend = Bun.env.RESEND_API_KEY
   ? new Resend(Bun.env.RESEND_API_KEY)
@@ -82,15 +85,19 @@ function escapeHtml(s: string): string {
 export async function sendCriticalAlert(alert: CriticalAlert): Promise<void> {
   try {
     // Always log regardless of whether email is configured/dedup'd.
-    console.error(
-      `[alert:${alert.source}] ${alert.message}`,
-      alert.error ?? "",
-    );
+    log.error(alert.message, {
+      source: alert.source,
+      err: alert.error,
+      ...alert.meta,
+    });
 
     if (!resend || ALERT_TO.length === 0) {
       if (Bun.env.NODE_ENV === "production") {
-        console.error(
-          "[alerts] RESEND_API_KEY / ALERT_EMAIL_TO not set — alert not emailed",
+        log.warn(
+          "RESEND_API_KEY / ALERT_EMAIL_TO not set — alert not emailed",
+          {
+            source: alert.source,
+          },
         );
       }
       return;
@@ -116,11 +123,11 @@ export async function sendCriticalAlert(alert: CriticalAlert): Promise<void> {
     });
 
     if (error) {
-      console.error("[alerts] Resend send failed:", error);
+      log.error("Resend send failed", { source: alert.source, err: error });
     }
   } catch (err) {
     // Swallow — alerting must never be the thing that crashes a worker.
-    console.error("[alerts] failed to send critical alert:", err);
+    log.error("failed to send critical alert", { source: alert.source, err });
   }
 }
 
@@ -132,7 +139,6 @@ export async function sendCriticalAlert(alert: CriticalAlert): Promise<void> {
  * Usage, at the bottom of a worker file:
  *   wireWorkerAlerts(bankingWorker, "worker:banking");
  */
-
 export function wireWorkerAlerts(
   worker: Worker<any, any, any>,
   source: string,

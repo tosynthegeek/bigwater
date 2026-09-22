@@ -2,6 +2,7 @@ import { Worker, type Job } from "bullmq";
 import { db } from "@/db";
 import { makeConnection } from "@/redis";
 import { wireWorkerAlerts } from "@/utils/alerts";
+import { logger } from "@/utils/logger";
 import { bankMonthlyScoreForUser } from "../economy/score";
 import {
   bankingQueue,
@@ -9,6 +10,9 @@ import {
   type BankJobData,
   type SweepJobData,
 } from "../queues/banking.queue";
+
+const sweepLog = logger.child({ source: "worker:banking-sweep" });
+const bankLog = logger.child({ source: "worker:banking" });
 
 // Finds closed, unbanked tallies and fans them out as individual per-user jobs.
 export const bankingSweepWorker = new Worker<SweepJobData>(
@@ -19,14 +23,10 @@ export const bankingSweepWorker = new Worker<SweepJobData>(
       where: (t, { and, lte, eq }) =>
         and(lte(t.periodEnd, now), eq(t.isFinalized, false)),
     });
-    console.log(`[banking-sweep] found ${closed.length} closed tallies`);
+    sweepLog.info("found closed tallies", { count: closed.length });
 
     await Promise.all(
       closed.map(async (t) => {
-        console.log(
-          `[banking-sweep] Queueing banking job for user=${t.userId} month=${t.month}`,
-        );
-
         const job = await bankingQueue.add(
           "bank",
           { userId: t.userId, month: t.month },
@@ -35,9 +35,11 @@ export const bankingSweepWorker = new Worker<SweepJobData>(
           },
         );
 
-        console.log(
-          `[banking-sweep] Added job id=${job.id} user=${t.userId} month=${t.month}`,
-        );
+        sweepLog.debug("queued banking job", {
+          jobId: job.id,
+          userId: t.userId,
+          month: t.month,
+        });
 
         return job;
       }),
@@ -64,13 +66,15 @@ export const bankingWorker = new Worker<BankJobData>(
 );
 
 bankingSweepWorker.on("failed", (job, err) => {
-  console.error(`banking-sweep failed job=${job?.id}:`, err);
+  sweepLog.error("sweep failed", { jobId: job?.id, err });
 });
 bankingWorker.on("failed", (job, err) => {
-  console.error(
-    `banking failed user=${job?.data.userId} month=${job?.data.month}:`,
+  bankLog.error("job failed", {
+    jobId: job?.id,
+    userId: job?.data.userId,
+    month: job?.data.month,
     err,
-  );
+  });
 });
 
 // Banking moves points from "pending" into a user's locked-in Sustainability
@@ -81,21 +85,21 @@ wireWorkerAlerts(bankingSweepWorker, "worker:banking-sweep");
 wireWorkerAlerts(bankingWorker, "worker:banking");
 
 bankingQueueEvents.on("completed", ({ jobId }) => {
-  console.log(`[banking] Job completed: ${jobId}`);
+  bankLog.debug("job completed", { jobId });
 });
 
 bankingWorker.on("ready", () => {
-  console.log("[banking] worker ready");
+  bankLog.info("worker ready");
 });
 
 bankingWorker.on("active", (job) => {
-  console.log("[banking] active", job.id);
+  bankLog.debug("job active", { jobId: job.id });
 });
 
 bankingWorker.on("completed", (job) => {
-  console.log("[banking] completed", job.id);
+  bankLog.info("job completed", { jobId: job.id });
 });
 
 bankingWorker.on("error", (err) => {
-  console.error("[banking] worker error", err);
+  bankLog.error("worker-level error", { err });
 });

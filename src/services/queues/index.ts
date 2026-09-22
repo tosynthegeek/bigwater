@@ -6,12 +6,15 @@ import { scheduleBankingSweep } from "./banking.queue";
 import { scheduleStreakSweep } from "./streak.queue";
 import { telegramMarketingWorker } from "../workers/telegram-marketing.worker";
 import { taskNotificationWorker } from "../workers/tasks.workers";
+import { logger } from "@/utils/logger";
+
+const log = logger.child({ source: "queues" });
 
 export async function startQueues() {
   await scheduleBankingSweep();
   await scheduleStreakSweep();
 
-  console.log("Starting queues...");
+  log.info("queues started");
 }
 
 export async function stopQueues() {

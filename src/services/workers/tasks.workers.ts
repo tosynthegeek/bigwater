@@ -6,6 +6,9 @@ import { participantProfile } from "@/db/schema/rail2";
 import { db } from "@/db";
 import { isNotNull } from "drizzle-orm";
 import { wireWorkerAlerts } from "@/utils/alerts";
+import { logger } from "@/utils/logger";
+
+const log = logger.child({ source: "worker:task-notification" });
 
 export const taskNotificationWorker = new Worker(
   "task-notification",
@@ -20,9 +23,7 @@ export const taskNotificationWorker = new Worker(
       .from(participantProfile)
       .where(isNotNull(participantProfile.telegramId));
 
-    console.log(
-      `[task-notification] sending to ${users.length} Telegram users`,
-    );
+    log.info("broadcasting task notification", { recipients: users.length });
 
     let sent = 0;
     let failed = 0;
@@ -37,26 +38,26 @@ export const taskNotificationWorker = new Worker(
         await bot.api.sendMessage(user.telegramId, message);
         sent++;
       } catch (err) {
-        console.error(
-          `Failed to send message to user ${user.telegramId}:`,
+        log.error("failed to send to Telegram user", {
+          telegramId: user.telegramId,
           err,
-        );
+        });
         failed++;
       }
     }
-    console.log(`task-notification completed: ${sent} sent, ${failed} failed`);
+    log.info("broadcast complete", { sent, failed });
   },
   { connection: makeConnection() },
 );
 
 taskNotificationWorker.on("failed", (job, err) => {
-  console.error(`task-notification failed job=${job?.id}:`, err);
+  log.error("job failed", { jobId: job?.id, err });
 });
 taskNotificationWorker.on("completed", (job) => {
-  console.log(`task-notification completed job=${job?.id}`);
+  log.info("job completed", { jobId: job?.id });
 });
 taskNotificationWorker.on("error", (err) => {
-  console.error("task-notification worker error", err);
+  log.error("worker-level error", { err });
 });
 
 wireWorkerAlerts(taskNotificationWorker, "worker:task-notification");

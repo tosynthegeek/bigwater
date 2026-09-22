@@ -1,4 +1,3 @@
-// workers/notification.worker.ts
 import { Worker } from "bullmq";
 import { bot } from "@/telegram/bot";
 import { getTaskById } from "@/services/tasks";
@@ -8,6 +7,9 @@ import { db } from "@/db";
 import { eq } from "drizzle-orm";
 import { InlineKeyboard } from "grammy";
 import { wireWorkerAlerts } from "@/utils/alerts";
+import { logger } from "@/utils/logger";
+
+const log = logger.child({ source: "worker:submission-notification" });
 
 export const notificationWorker = new Worker(
   "submission-notification",
@@ -25,7 +27,7 @@ export const notificationWorker = new Worker(
     });
 
     if (!user) {
-      console.error(`User ${userId} not found for notification`);
+      log.error("user not found for notification", { userId });
       return;
     }
 
@@ -34,7 +36,7 @@ export const notificationWorker = new Worker(
     const task = await getTaskById(taskId);
 
     if (!task) {
-      console.error(`Task ${taskId} not found for notification`);
+      log.error("task not found for notification", { taskId });
       return;
     }
 
@@ -80,13 +82,13 @@ export const notificationWorker = new Worker(
 );
 
 notificationWorker.on("failed", (job, err) => {
-  console.error(`submission-notification failed job=${job?.id}:`, err);
+  log.error("job failed", { jobId: job?.id, err });
 });
 notificationWorker.on("completed", (job) => {
-  console.log(`submission-notification completed job=${job?.id}`);
+  log.info("job completed", { jobId: job?.id });
 });
 notificationWorker.on("error", (err) => {
-  console.error("submission-notification worker error", err);
+  log.error("worker-level error", { err });
 });
 
 wireWorkerAlerts(notificationWorker, "worker:submission-notification");

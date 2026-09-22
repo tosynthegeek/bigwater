@@ -3,6 +3,9 @@ import type { SubmissionEvaluationJobData } from "../queues/evaluation.queue";
 import { evaluateSubmission } from "../ai/evaluate";
 import { makeConnection } from "@/redis";
 import { wireWorkerAlerts } from "@/utils/alerts";
+import { logger } from "@/utils/logger";
+
+const log = logger.child({ source: "worker:evaluation" });
 
 export const submissionEvaluationWorker =
   new Worker<SubmissionEvaluationJobData>(
@@ -23,15 +26,15 @@ export const submissionEvaluationWorker =
   );
 
 submissionEvaluationWorker.on("failed", (job, err) => {
-  console.error(`Submission evaluation job ${job?.id} failed:`, err.message);
+  log.error("job failed", { jobId: job?.id, err });
 });
 
 submissionEvaluationWorker.on("completed", (job) => {
-  console.log("Submission evaluation job completed", job.id);
+  log.info("job completed", { jobId: job.id });
 });
 
 submissionEvaluationWorker.on("error", (err) => {
-  console.error("Submission evaluation job worker error", err);
+  log.error("worker-level error", { err });
 });
 
 // Both the Sightengine and OpenRouter calls this worker makes can fail

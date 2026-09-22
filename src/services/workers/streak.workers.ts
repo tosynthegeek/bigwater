@@ -3,6 +3,9 @@ import { runStreakBreakSweep } from "../economy/streaks";
 import type { SweepJobData } from "../queues/banking.queue";
 import { Worker } from "bullmq";
 import { wireWorkerAlerts } from "@/utils/alerts";
+import { logger } from "@/utils/logger";
+
+const log = logger.child({ source: "worker:streak-sweep" });
 
 export const streakSweepWorker = new Worker<SweepJobData>(
   "streak-sweep",
@@ -13,13 +16,13 @@ export const streakSweepWorker = new Worker<SweepJobData>(
 );
 
 streakSweepWorker.on("failed", (job, err) => {
-  console.error(`streak-sweep failed job=${job?.id}:`, err);
+  log.error("sweep failed", { jobId: job?.id, err });
 });
 streakSweepWorker.on("completed", (job) => {
-  console.log(`streak-sweep completed job=${job?.id}`);
+  log.info("sweep completed", { jobId: job?.id });
 });
 streakSweepWorker.on("error", (err) => {
-  console.error("streak-sweep worker error", err);
+  log.error("worker-level error", { err });
 });
 
 wireWorkerAlerts(streakSweepWorker, "worker:streak-sweep");
