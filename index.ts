@@ -71,7 +71,7 @@ const server = Bun.serve({
   fetch: app.fetch,
 });
 
-console.log(`🚀 API running on http://localhost:${port}`);
+console.log(`🚀 API running on port ${port}`);
 
 // Single-service deployments (e.g. staging on one Railway service) can run the
 // Telegram bot in the same process as the API by setting RUN_BOT_IN_PROCESS=true.
