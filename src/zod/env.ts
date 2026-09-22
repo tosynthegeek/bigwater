@@ -52,6 +52,7 @@ const envSchema = z.object({
   RESEND_API_KEY: z.string().optional(),
   ALERT_EMAIL_FROM: z.string().optional(),
   ALERT_EMAIL_TO: z.string().optional(),
+  ALERT_ON_REDEPLOY: z.string().optional(),
 });
 
 export default function parseEnv() {

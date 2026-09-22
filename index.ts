@@ -84,6 +84,11 @@ if (Bun.env.RUN_BOT_IN_PROCESS === "true") {
   console.log("🤖 Telegram bot started in-process (long polling)");
 }
 
+if (Bun.env.ALERT_ON_REDEPLOY === "true") {
+  const { sendRedeployAlert } = await import("@/utils/alerts");
+  void sendRedeployAlert();
+}
+
 let shuttingDown = false;
 
 async function shutdown(signal: string) {

@@ -166,3 +166,51 @@ export function wireWorkerAlerts(
     });
   });
 }
+
+export async function sendRedeployAlert(): Promise<void> {
+  if (Bun.env.ALERT_ON_REDEPLOY !== "true") return;
+
+  try {
+    if (!resend || ALERT_TO.length === 0) {
+      log.warn("Resend not configured — deployment alert not sent");
+      return;
+    }
+
+    const environment = Bun.env.NODE_ENV ?? "development";
+
+    await resend.emails.send({
+      from: ALERT_FROM,
+      to: ALERT_TO,
+      subject: `🚀 [BigWater/${environment}] Deployment successful`,
+      html: `
+        <div style="font-family: sans-serif">
+          <h2>🚀 BigWater deployment</h2>
+
+          <p>
+            A new BigWater deployment has started successfully.
+          </p>
+
+          <table style="border-collapse: collapse">
+
+            <tr>
+              <td style="padding: 4px 12px 4px 0; color: #666">
+                Environment
+              </td>
+              <td>${escapeHtml(environment)}</td>
+            </tr>
+          </table>
+
+          <p style="color: #999; font-size: 12px">
+            ${new Date().toISOString()}
+          </p>
+        </div>
+      `,
+    });
+
+    log.info("deployment alert sent", {
+      environment,
+    });
+  } catch (err) {
+    log.error("failed to send deployment alert", { err });
+  }
+}
