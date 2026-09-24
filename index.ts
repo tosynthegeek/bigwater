@@ -27,8 +27,46 @@ process.on("unhandledRejection", (reason) => {
 });
 
 parseEnv();
+checkLocalStorageConfig();
 await runSeeds();
 await startQueues();
+
+// With STORAGE_DRIVER=local, submission images are written to this service's
+// disk and linked as `${PUBLIC_BASE_URL}/uploads/...`. If PUBLIC_BASE_URL
+// points at a different Railway service (e.g. copied from staging), the AI
+// evaluation worker 404s fetching every image and no submission ever reaches
+// the admin queue. Without a volume, uploads are also wiped on every deploy.
+function checkLocalStorageConfig() {
+  if (Bun.env.STORAGE_DRIVER !== "local") return;
+
+  const ownDomain = Bun.env.RAILWAY_PUBLIC_DOMAIN;
+  if (!ownDomain) return; // not on Railway
+
+  let baseHost = "";
+  try {
+    baseHost = new URL(Bun.env.PUBLIC_BASE_URL ?? "").host;
+  } catch {}
+
+  // A custom domain can legitimately differ from the Railway domain, so only
+  // flag a mismatch when PUBLIC_BASE_URL is itself another Railway domain.
+  if (
+    !baseHost ||
+    (baseHost.endsWith(".up.railway.app") && baseHost !== ownDomain)
+  ) {
+    void sendCriticalAlert({
+      source: "config:storage",
+      message: `PUBLIC_BASE_URL (${Bun.env.PUBLIC_BASE_URL ?? "unset"}) does not point at this service (${ownDomain}); submission images will not load`,
+    });
+  }
+
+  if (!Bun.env.RAILWAY_VOLUME_MOUNT_PATH) {
+    void sendCriticalAlert({
+      source: "config:storage",
+      message:
+        "STORAGE_DRIVER=local but no Railway volume is mounted; uploaded images are lost on every deploy",
+    });
+  }
+}
 
 async function warmupPrivy() {
   const originalError = console.error;

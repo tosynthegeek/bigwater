@@ -4,6 +4,9 @@ import { evaluateSubmission } from "../ai/evaluate";
 import { makeConnection } from "@/redis";
 import { wireWorkerAlerts } from "@/utils/alerts";
 import { logger } from "@/utils/logger";
+import { db } from "@/db";
+import { submissions } from "@/db/schema/rail2";
+import { and, eq } from "drizzle-orm";
 
 const log = logger.child({ source: "worker:evaluation" });
 
@@ -27,7 +30,36 @@ export const submissionEvaluationWorker =
 
 submissionEvaluationWorker.on("failed", (job, err) => {
   log.error("job failed", { jobId: job?.id, err });
+
+  // Once every retry is spent, hand the submission to a human anyway. The
+  // admin review queue only lists "under_review", so leaving it "pending"
+  // would make the member's proof invisible to admins forever.
+  if (!job || job.attemptsMade < (job.opts.attempts ?? 1)) return;
+  void releaseToManualReview(job.data.submissionId, err);
 });
+
+async function releaseToManualReview(submissionId: string, err: Error) {
+  try {
+    await db
+      .update(submissions)
+      .set({
+        status: "under_review",
+        aiConfidence: null,
+        aiVerdict: `AI check failed, please review manually. (${err.message.slice(0, 300)})`,
+      })
+      .where(
+        and(eq(submissions.id, submissionId), eq(submissions.status, "pending")),
+      );
+    log.warn("released to manual review after AI evaluation failed", {
+      submissionId,
+    });
+  } catch (updateErr) {
+    log.error("failed to release submission to manual review", {
+      submissionId,
+      err: updateErr,
+    });
+  }
+}
 
 submissionEvaluationWorker.on("completed", (job) => {
   log.info("job completed", { jobId: job.id });
