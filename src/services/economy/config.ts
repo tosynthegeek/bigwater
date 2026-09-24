@@ -44,8 +44,8 @@ export function resolveTallyPeriodMs(): number {
 }
 
 export function periodIndex(date: Date, periodMs: number) {
-  if (periodMs <= 0) {
-    throw new Error("periodMs must be greater than zero");
+  if (periodMs < 0) {
+    throw new Error("periodMs must be a positive number");
   }
   return Math.floor(date.getTime() / periodMs);
 }

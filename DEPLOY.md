@@ -8,12 +8,12 @@ These notes cover a Railway deployment for the client demo.
 
 One repo → one Docker image → **four Railway resources** in a single project:
 
-| Resource            | What it is                        | Start command / notes                          |
-| ------------------- | --------------------------------- | ---------------------------------------------- |
-| **Postgres**        | Railway plugin                    | provides `DATABASE_URL`                         |
-| **Redis**           | Railway plugin                    | provides `REDIS_URL` (rate-limit + bot session)|
-| **api** service     | this repo (Dockerfile)            | `bun run start:api` (migrate, then serve)      |
-| **bot** service     | this repo (Dockerfile)            | `bun run start:bot` (Telegram long-polling)    |
+| Resource        | What it is             | Start command / notes                           |
+| --------------- | ---------------------- | ----------------------------------------------- |
+| **Postgres**    | Railway plugin         | provides `DATABASE_URL`                         |
+| **Redis**       | Railway plugin         | provides `REDIS_URL` (rate-limit + bot session) |
+| **api** service | this repo (Dockerfile) | `bun run start:api` (migrate, then serve)       |
+| **bot** service | this repo (Dockerfile) | `bun run start:bot` (Telegram long-polling)     |
 
 `railway.json` sets the **api** defaults (Dockerfile build, `/health` healthcheck).
 The **bot** service uses the same image with its start command overridden to

@@ -1,5 +1,6 @@
 import { defineConfig } from "drizzle-kit";
 
+// This file is used to configure the Drizzle ORM CLI. You can learn more about the available options in the documentation: https://orm.drizzle.team/docs/cli/configuration
 export default defineConfig({
   dialect: "postgresql",
   out: "src/db/migrations",
