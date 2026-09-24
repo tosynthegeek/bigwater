@@ -8,7 +8,7 @@ export function registerCancelHandler(bot: Bot<BotContext>) {
 
     await ctx.reply(
       "Cancelled, clean slate. Nothing was submitted.\n\n" +
-        "/task whenever you're ready.",
+        "/tasks whenever you're ready.",
     );
   });
 }
