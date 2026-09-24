@@ -17,6 +17,13 @@ export async function sendActiveTaskList(ctx: BotContext) {
     return;
   }
 
+  if (user.isFlagged) {
+    await ctx.reply(
+      "Your account is currently restricted from submitting tasks. Please contact support if you believe this is a mistake.",
+    );
+    return;
+  }
+
   const status = await getSubmissionLimitStatus(user.id);
   const remaining = Math.max(
     0,

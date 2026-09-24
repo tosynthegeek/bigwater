@@ -234,11 +234,18 @@ export async function resolveUserByTelegramId(telegramUserId: string) {
     return null;
   }
 
-  const user = db.query.authUsers.findFirst({
+  const user = await db.query.authUsers.findFirst({
     where: eq(authUsers.id, profile.userId),
   });
 
-  return user;
+  if (!user) {
+    return null;
+  }
+
+  return {
+    ...user,
+    isFlagged: profile.isFlagged,
+  };
 }
 
 export async function generateTelegramLinkCode(userId: string) {
