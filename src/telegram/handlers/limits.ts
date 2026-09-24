@@ -15,6 +15,13 @@ export function registerLimitsHandler(bot: Bot<BotContext>) {
       return;
     }
 
+    if (user.isFlagged) {
+      await ctx.reply(
+        "Your account is currently flagged from submitting tasks. Please contact support if you believe this is a mistake.",
+      );
+      return;
+    }
+
     const status = await getSubmissionLimitStatus(user.id);
     const remaining = Math.max(
       0,
