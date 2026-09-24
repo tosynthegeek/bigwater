@@ -19,7 +19,7 @@ export async function sendActiveTaskList(ctx: BotContext) {
 
   if (user.isFlagged) {
     await ctx.reply(
-      "Your account is currently restricted from submitting tasks. Please contact support if you believe this is a mistake.",
+      "Your account is currently flagged from submitting tasks. Please contact support if you believe this is a mistake.",
     );
     return;
   }
