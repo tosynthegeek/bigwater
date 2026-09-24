@@ -58,10 +58,12 @@ export async function getGlobalLeaderboard(
   currentUserId: string,
 ) {
   const now = new Date();
+
   const totalPoints = sql<number>`
-    COALESCE(${sustainabilityScore.totalScore}, 0) + 
+    COALESCE(${sustainabilityScore.totalScore}, 0) +
     COALESCE(${rail1Users.totalPoints}, 0)
   `;
+
   return db
     .select({
       userId: authUsers.id,
@@ -73,17 +75,24 @@ export async function getGlobalLeaderboard(
       currentBand: monthlyTally.band,
       currentStreak: userStreaks.currentStreak,
       isUser: currentUserId
-        ? sql<boolean>`${authUsers.id} = ${currentUserId}`
+        ? sql<boolean>`COALESCE(${authUsers.id} = ${currentUserId}, false)`
         : sql<boolean>`false`,
       rank: sql<number>`RANK() OVER (ORDER BY ${totalPoints} DESC)`.as("rank"),
     })
-    .from(participantProfile)
-    .innerJoin(authUsers, eq(authUsers.id, participantProfile.userId))
+    .from(rail1Users)
+    .fullJoin(
+      participantProfile,
+      eq(participantProfile.rail1UserId, rail1Users.id),
+    )
+    .leftJoin(authUsers, eq(authUsers.id, participantProfile.userId))
     .leftJoin(sustainabilityScore, eq(sustainabilityScore.userId, authUsers.id))
-    .leftJoin(rail1Users, eq(rail1Users.id, participantProfile.rail1UserId))
     .leftJoin(monthlyTally, currentMonthJoin(now))
     .leftJoin(userStreaks, eq(userStreaks.userId, authUsers.id))
-    .orderBy(desc(totalPoints))
+    .orderBy(
+      desc(totalPoints),
+      // stable tiebreaker so limit/offset pages don't repeat or skip tied rows
+      sql`COALESCE(${authUsers.id}::text, ${rail1Users.id}::text) ASC`,
+    )
     .limit(limit)
     .offset(offset);
 }
@@ -186,7 +195,7 @@ export async function getUserLeaderboardContext(
       current_streak: number | null;
       rank: number;
     }>(sql`
-      SELECT  points, rail1_points, rail2_points, current_band, current_streak, rank FROM (
+      SELECT points, rail1_points, rail2_points, current_band, current_streak, rank FROM (
         SELECT
           u.id AS user_id,
           COALESCE(ss.total_score, 0) + COALESCE(r1.total_points, 0) AS points,
@@ -195,10 +204,10 @@ export async function getUserLeaderboardContext(
           mt.band AS current_band,
           us.current_streak,
           RANK() OVER (ORDER BY (COALESCE(ss.total_score, 0) + COALESCE(r1.total_points, 0)) DESC) AS rank
-        FROM participant_profile pp
-        INNER JOIN auth_accounts u ON u.id = pp.user_id
+        FROM users r1
+        FULL JOIN participant_profile pp ON pp.rail1_user_id = r1.id
+        LEFT JOIN auth_accounts u ON u.id = pp.user_id
         LEFT JOIN sustainability_score ss ON ss.user_id = u.id
-        LEFT JOIN users r1 ON r1.id = pp.rail1_user_id
         LEFT JOIN monthly_tally mt ON mt.user_id = u.id AND mt.month = ${getTallyPeriod(now).key}
         LEFT JOIN user_streaks us ON us.user_id = u.id
       ) ranked
