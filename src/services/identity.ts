@@ -92,39 +92,52 @@ export async function getOrCreateUserByPrivyDid(
     throw new Rail1LinkError("Invalid Rail1 token");
   }
 
-  return db.transaction(async (tx) => {
-    const [user] = await tx
-      .insert(authUsers)
-      .values({
-        privyDid,
-      })
-      .returning();
+  try {
+    return await db.transaction(async (tx) => {
+      const [user] = await tx
+        .insert(authUsers)
+        .values({
+          privyDid,
+        })
+        .returning();
 
-    if (!user) {
-      throw new AuthenticationError(
-        `Insert into users returned no row for privyDid=${privyDid}`,
-      );
-    }
+      if (!user) {
+        throw new AuthenticationError(
+          `Insert into users returned no row for privyDid=${privyDid}`,
+        );
+      }
 
-    const [profile] = await tx
-      .insert(participantProfile)
-      .values({
-        userId: user.id,
-        rail1UserId,
-      })
-      .returning();
+      const [profile] = await tx
+        .insert(participantProfile)
+        .values({
+          userId: user.id,
+          rail1UserId,
+        })
+        .returning();
 
-    if (!profile) {
-      throw new AuthenticationError(
-        `Insert into participantProfile returned no row for userId=${user.id}`,
-      );
-    }
+      if (!profile) {
+        throw new AuthenticationError(
+          `Insert into participantProfile returned no row for userId=${user.id}`,
+        );
+      }
 
-    return {
-      ...user,
-      participantProfile: profile,
-    };
-  });
+      return {
+        ...user,
+        participantProfile: profile,
+      };
+    });
+  } catch (err) {
+    // A new member's first page load fires several authenticated requests at
+    // once; each misses the lookup above and races to create the same row.
+    // The losers hit auth_accounts_privy_did_unique — return the winner's
+    // row instead of failing the request with a 500.
+    const recovered = await db.query.authUsers.findFirst({
+      where: eq(authUsers.privyDid, privyDid),
+      with: { participantProfile: true },
+    });
+    if (recovered) return recovered;
+    throw err;
+  }
 }
 
 export async function getOrcreateAdminByPrivyDid(privyDid: string) {
