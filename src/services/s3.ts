@@ -28,6 +28,11 @@ export async function uploadFileToS3(
   if (STORAGE_DRIVER === "local") {
     await mkdir(UPLOAD_DIR, { recursive: true });
     await Bun.write(`${UPLOAD_DIR}/${filename}`, imageFile);
+
+    console.log(
+      `[S3] Uploaded file to local storage: ${UPLOAD_DIR}/${filename}`,
+    );
+
     return `${PUBLIC_BASE_URL}/uploads/${filename}`;
   }
 
@@ -44,6 +49,9 @@ export async function uploadFileToS3(
   try {
     await s3Client.send(putObjectCommand);
 
+    console.log(
+      `[S3] Uploaded file to S3: ${AWS_BUCKET_NAME}/${key}.${extension}`,
+    );
     return `${AWS_CLOUDFRONT_URL}/${key}.${extension}`;
   } catch (error) {
     console.error("Failed to upload file to S3: ", error);
