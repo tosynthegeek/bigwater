@@ -10,7 +10,7 @@ import { privy } from "@/privy";
 import { verifyRail1Token } from "@/middleware/rail1-jwt";
 
 const TELEGRAM_LINK_CODE_TTL_MS = 10 * 60 * 1000;
-const TELEGRAM_BOT_CONNECT_POINTS = 50;
+const TELEGRAM_BOT_CONNECT_POINTS = 100;
 
 export class AuthenticationError extends Error {
   constructor(message: string) {
