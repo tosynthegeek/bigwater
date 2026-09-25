@@ -24,6 +24,7 @@ import {
   adjustParticipantPoints,
   flagParticipant,
   getAllParticipants,
+  warnParticipant,
 } from "../controllers/admin/admin-participants-controllers";
 import {
   addAdmin,
@@ -65,6 +66,7 @@ AdminRouter.get(
 );
 
 AdminRouter.get("/participants", getAllParticipants);
+AdminRouter.post("/participants/:participantId/warn", warnParticipant);
 AdminRouter.patch("/participants/:userId/flag", flagParticipant);
 AdminRouter.post("/participants/:userId/points", adjustParticipantPoints);
 AdminRouter.get("/overview", getPlatformOverview);
