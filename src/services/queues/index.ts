@@ -8,6 +8,8 @@ import { telegramMarketingWorker } from "../workers/telegram-marketing.worker";
 import { taskNotificationWorker } from "../workers/tasks.workers";
 import { healthCheckWorker } from "../workers/health-check.worker";
 import { scheduleHealthCheck } from "./health-check.queue";
+import { morningNotificationWorker } from "../workers/morning-notification.worker";
+import { scheduleMorningNotification } from "./morning-notification.queue";
 import { logger } from "@/utils/logger";
 
 const log = logger.child({ source: "queues" });
@@ -16,6 +18,7 @@ export async function startQueues() {
   await scheduleBankingSweep();
   await scheduleStreakSweep();
   await scheduleHealthCheck();
+  await scheduleMorningNotification();
 
   log.info("queues started");
 }
@@ -30,5 +33,6 @@ export async function stopQueues() {
     telegramMarketingWorker.close(),
     taskNotificationWorker.close(),
     healthCheckWorker.close(),
+    morningNotificationWorker.close(),
   ]);
 }
