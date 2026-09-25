@@ -8,21 +8,21 @@ import {
   revokeAdminSchema,
   updateOwnPasswordSchema,
 } from "@/zod/admin";
-import { handlePasswordLogin, handlePrivyLogin } from "./helpers/login";
+import { checkRateLimit } from "@/utils/time";
+import redisClient from "@/redis";
+import {
+  handlePasswordLogin,
+  handlePrivyLogin,
+  hashOtp,
+  issueAdminSession,
+  MAX_OTP_ATTEMPTS,
+} from "./helpers/login";
 
-// Finds any existing row for this identity, whether it's a currently-claimed
-// account (email/walletAddress populated) or a still-unclaimed placeholder
-// (this codebase's convention: privyDid holds the raw email/wallet string
-// until a real Privy login claims it — see getOrcreateAdminByPrivyDid in
-// services/identity.ts). Matching only email/walletAddress would miss the
-// unclaimed-placeholder shape entirely.
-async function findExistingByIdentifier(email?: string, walletAddress?: string) {
-  const identifier = (email ?? walletAddress)!.toLowerCase();
+async function findExistingByIdentifier(email: string) {
   return db.query.authUsers.findFirst({
     where: or(
-      eq(sql`lower(${authUsers.privyDid})`, identifier),
-      email ? eq(authUsers.email, identifier) : undefined,
-      walletAddress ? eq(authUsers.walletAddress, identifier) : undefined,
+      eq(sql`lower(${authUsers.privyDid})`, email.toLowerCase()),
+      eq(authUsers.email, email.toLowerCase()),
     ),
   });
 }
@@ -40,6 +40,64 @@ export async function adminLogin(c: Context) {
   }
 
   return c.json({ error: "No valid credentials provided" }, 400);
+}
+
+export async function verifyAdminOtp(c: Context) {
+  const body = await c.req.json().catch(() => null);
+  const pendingToken = body?.pendingToken;
+  const code = body?.code;
+
+  if (!pendingToken || !code) {
+    return c.json({ error: "pendingToken and code are required" }, 400);
+  }
+
+  try {
+    await checkRateLimit(`otp-verify:${pendingToken}`);
+  } catch {
+    return c.json({ error: "Too many attempts, try again later" }, 429);
+  }
+
+  const key = `otp:${pendingToken}`;
+  const raw = await redisClient.get(key);
+  if (!raw) {
+    return c.json(
+      { error: "Code expired or invalid, please log in again" },
+      401,
+    );
+  }
+
+  const record = JSON.parse(raw) as {
+    adminId: string;
+    codeHash: string;
+    attempts: number;
+  };
+
+  if (record.attempts >= MAX_OTP_ATTEMPTS) {
+    await redisClient.del(key);
+    return c.json(
+      { error: "Too many incorrect attempts, please log in again" },
+      401,
+    );
+  }
+
+  if (hashOtp(code) !== record.codeHash) {
+    record.attempts += 1;
+    const ttl = await redisClient.ttl(key);
+    await redisClient.set(key, JSON.stringify(record), "EX", Math.max(ttl, 1));
+    return c.json({ error: "Incorrect code" }, 401);
+  }
+
+  await redisClient.del(key);
+
+  const admin = await db.query.authUsers.findFirst({
+    where: eq(authUsers.id, record.adminId),
+  });
+
+  if (!admin || (admin.role !== "admin" && admin.role !== "superadmin")) {
+    return c.json({ error: "Unauthorized" }, 403);
+  }
+
+  return issueAdminSession(c, admin);
 }
 
 export async function getAllAdmins(c: Context) {
@@ -88,9 +146,9 @@ export async function addAdmin(c: Context) {
 
   try {
     if (validatedBody.data.method === "privy") {
-      const { email, walletAddress } = validatedBody.data.identifier;
-      const identifier = (email ?? walletAddress)!.toLowerCase();
-      const existing = await findExistingByIdentifier(email, walletAddress);
+      const { email } = validatedBody.data.identifier;
+      const identifier = email.toLowerCase();
+      const existing = await findExistingByIdentifier(email);
 
       if (existing) {
         // Only ever true for a previously-revoked admin — revokeAdmin
@@ -112,7 +170,7 @@ export async function addAdmin(c: Context) {
         // Already an active admin/superadmin, or an unclaimed invite
         // already pending for this identity — don't silently overwrite
         // either; tell the caller plainly what's actually going on.
-        const pending = !existing.email && !existing.walletAddress;
+        const pending = !existing.email;
         return c.json(
           {
             error: pending
@@ -155,7 +213,7 @@ export async function addAdmin(c: Context) {
         return c.json({ admin: reactivated, reactivated: true }, 200);
       }
 
-      const pending = !existing.email && !existing.walletAddress;
+      const pending = !existing.email;
       return c.json(
         {
           error: pending
