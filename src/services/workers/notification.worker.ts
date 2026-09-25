@@ -18,6 +18,7 @@ export const notificationWorker = new Worker(
       userId,
       taskId,
       status,
+      verdict,
       isFirstSubmission,
       isFirstApprovedSubmission,
     } = job.data;
@@ -30,6 +31,12 @@ export const notificationWorker = new Worker(
       log.error("user not found for notification", { userId });
       return;
     }
+
+    const feedback = verdict?.trim();
+
+    const feedbackMessage = feedback
+      ? `💡 Reviewer feedback:\n${feedback}\n\n`
+      : "";
 
     if (!user?.telegramId) return;
 
@@ -60,12 +67,14 @@ export const notificationWorker = new Worker(
         `❌ This one didn’t make it. Happens to the best of us.\n\n` +
         `Nine times out of ten it means the photo didn’t clearly show the task done. ` +
         `Your Score is untouched, and the task is still open.\n\n` +
+        `${feedbackMessage}` +
         `Tap Resubmit and send a clearer shot.`;
     } else {
       message =
         `❌ Not this time either.\n\n` +
         `Quick tip: get the whole task in frame, in decent light. ` +
         `The reviewer can only approve what they can see.\n\n` +
+        `${feedbackMessage}` +
         `Resubmit whenever you’re ready.`;
     }
 
