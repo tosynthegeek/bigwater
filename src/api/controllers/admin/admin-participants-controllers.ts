@@ -7,6 +7,7 @@ import {
   authUsers,
   userStreaks,
   type User,
+  participantWarnings,
 } from "@/db/schema/rail2";
 import { db } from "@/db";
 import { and, eq, ilike, or, sql } from "drizzle-orm";
@@ -239,6 +240,77 @@ export async function adjustParticipantPoints(c: Context) {
     });
   } catch (error) {
     console.error("adjustParticipantPoints.error:", error);
+    return c.json({ error: "Internal server error" }, 500);
+  }
+}
+
+export async function warnParticipant(c: Context) {
+  const admin = c.get("user") as User;
+  if (!admin || (admin.role !== "superadmin" && admin.role !== "admin")) {
+    return c.json({ error: "Admin access required" }, 403);
+  }
+
+  const participantId = c.req.param("participantId");
+  if (!participantId) {
+    return c.json({ error: "Participant ID is required" }, 400);
+  }
+
+  const { reason } = await c.req.json();
+  if (!reason) {
+    return c.json({ error: "reason is required for audit" }, 400);
+  }
+
+  try {
+    const result = await db.transaction(async (tx) => {
+      const [updated] = await tx
+        .update(participantProfile)
+        .set({
+          warningCount: sql`${participantProfile.warningCount} + 1`,
+          updatedAt: new Date(),
+        })
+        .where(eq(participantProfile.userId, participantId))
+        .returning({
+          id: participantProfile.id,
+          userId: participantProfile.userId,
+          warningCount: participantProfile.warningCount,
+          username: participantProfile.username,
+          telegramId: participantProfile.telegramId,
+        });
+
+      if (!updated) {
+        return null;
+      }
+
+      // CHANGED: use updated.id (participantProfile.id), not the userId
+      // route param, since participantWarnings.participantId references
+      // participantProfile.id.
+      await tx.insert(participantWarnings).values({
+        participantId: updated.id,
+        reason,
+        issuedBy: admin.id,
+      });
+
+      return updated;
+    });
+
+    if (!result) {
+      return c.json({ error: "Participant not found" }, 404);
+    }
+
+    console.log(
+      `Admin ${admin.id} warned user ${result.userId}. Reason: ${reason}`,
+    );
+
+    return c.json({
+      message: "Participant warned successfully",
+      participant: {
+        userId: result.userId,
+        warningCount: result.warningCount,
+        username: result.username,
+      },
+    });
+  } catch (error) {
+    console.error("warnParticipant.error:", error);
     return c.json({ error: "Internal server error" }, 500);
   }
 }
