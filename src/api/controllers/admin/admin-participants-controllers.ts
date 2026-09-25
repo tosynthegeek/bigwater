@@ -15,6 +15,7 @@ import { format } from "date-fns";
 import { getBandForMonthlyTally } from "@/services/economy/bands";
 import { getTallyPeriod } from "@/services/economy/tally";
 import { rail1Users } from "@/db/schema/rail1";
+import { enqueueParticipantNotification } from "@/services/queues/participant-notification.queue";
 
 export async function getAllParticipants(c: Context) {
   const limit = Math.min(parseInt(c.req.query("limit") || "50"), 100);
@@ -144,6 +145,7 @@ export async function flagParticipant(c: Context) {
         userId: participantProfile.userId,
         isFlagged: participantProfile.isFlagged,
         username: participantProfile.username,
+        telegramId: participantProfile.telegramId,
       });
 
     if (!updated) {
@@ -153,6 +155,12 @@ export async function flagParticipant(c: Context) {
     console.log(
       `Admin ${admin.id} ${isFlagged ? "flagged" : "unflagged"} user ${userId}. Reason: ${reason || "none"}`,
     );
+
+    if (isFlagged && updated.telegramId) {
+      const reasonText = reason ? ` Reason: ${reason}` : "";
+      const message = `🚩 Your account has been flagged.${reasonText} Please contact support if you believe this is a mistake`;
+      await enqueueParticipantNotification(updated.telegramId, message);
+    }
 
     return c.json({
       message: `Participant ${isFlagged ? "flagged" : "unflagged"} successfully`,
@@ -300,6 +308,11 @@ export async function warnParticipant(c: Context) {
     console.log(
       `Admin ${admin.id} warned user ${result.userId}. Reason: ${reason}`,
     );
+
+    if (result.telegramId) {
+      const message = `⚠️ You have received a warning on your account.\nReason: ${reason}\n\n.Please review the community guidelines to avoid further action.`;
+      await enqueueParticipantNotification(result.telegramId, message);
+    }
 
     return c.json({
       message: "Participant warned successfully",

@@ -11,6 +11,7 @@ import { scheduleHealthCheck } from "./health-check.queue";
 import { morningNotificationWorker } from "../workers/morning-notification.worker";
 import { scheduleMorningNotification } from "./morning-notification.queue";
 import { logger } from "@/utils/logger";
+import { participantNotificationWorker } from "../workers/participant-notification.worker";
 
 const log = logger.child({ source: "queues" });
 
@@ -34,5 +35,6 @@ export async function stopQueues() {
     taskNotificationWorker.close(),
     healthCheckWorker.close(),
     morningNotificationWorker.close(),
+    participantNotificationWorker.close(),
   ]);
 }
