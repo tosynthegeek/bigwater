@@ -29,6 +29,13 @@ export const submissionSource = pgEnum("submission_source", [
   "web",
   "telegram",
 ]);
+export const warningReason = pgEnum("warning_reason", [
+  "spam",
+  "abusive_behavior",
+  "low_quality_submissions",
+  "policy_violation",
+  "other",
+]);
 
 export const authUsers = pgTable("auth_accounts", {
   id: varchar("id").primaryKey().$defaultFn(nanoid),
@@ -58,11 +65,27 @@ export const participantProfile = pgTable("participant_profile", {
   telegramId: text("telegram_id").unique(),
   isMember: boolean("is_member").notNull().default(false),
   isFlagged: boolean("is_flagged").notNull().default(false),
+  warningCount: integer("warning_count").notNull().default(0),
   status: text("status").notNull().default("active"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export const participantWarnings = pgTable("participant_warnings", {
+  id: varchar("id").primaryKey().$defaultFn(nanoid),
+  participantId: varchar("participant_id")
+    .notNull()
+    .references(() => participantProfile.id, { onDelete: "cascade" }),
+  reason: warningReason("reason").notNull(),
+  note: text("note"),
+  issuedBy: varchar("issued_by").references(() => authUsers.id, {
+    onDelete: "set null",
+  }),
+  createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
 });
