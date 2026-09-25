@@ -27,21 +27,21 @@ export async function seedBands() {
       name: "Thriving",
       minPoints: 600,
       maxPoints: 799,
-      multiplier: 150, // 1.5x
+      multiplier: 125, // 1.25x
       order: 3,
     },
     {
       name: "Flourishing",
       minPoints: 800,
       maxPoints: 949,
-      multiplier: 200, // 2.0x
+      multiplier: 175, // 1.75x
       order: 4,
     },
     {
       name: "Regenerative",
       minPoints: 950,
       maxPoints: 1000,
-      multiplier: 300, // 3.0x
+      multiplier: 200, // 2.0x
       order: 5,
     },
   ]);
