@@ -53,6 +53,7 @@ const envSchema = z.object({
   ALERT_EMAIL_FROM: z.string().optional(),
   ALERT_EMAIL_TO: z.string().optional(),
   ALERT_ON_REDEPLOY: z.string().optional(),
+  AUTH_EMAIL_FROM: z.string(),
 });
 
 export default function parseEnv() {

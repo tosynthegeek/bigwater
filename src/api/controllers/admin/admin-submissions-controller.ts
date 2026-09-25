@@ -123,6 +123,7 @@ export async function reviewSubmission(c: Context) {
           userId: updatedSubmission.userId,
           taskId: updatedSubmission.taskId,
           status: updatedSubmission.status,
+          verdict: updatedSubmission.aiVerdict,
           isFirstSubmission,
           isFirstApprovedSubmission,
         },

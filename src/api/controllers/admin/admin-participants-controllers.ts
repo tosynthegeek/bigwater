@@ -7,6 +7,7 @@ import {
   authUsers,
   userStreaks,
   type User,
+  participantWarnings,
 } from "@/db/schema/rail2";
 import { db } from "@/db";
 import { and, eq, ilike, or, sql } from "drizzle-orm";
@@ -14,6 +15,7 @@ import { format } from "date-fns";
 import { getBandForMonthlyTally } from "@/services/economy/bands";
 import { getTallyPeriod } from "@/services/economy/tally";
 import { rail1Users } from "@/db/schema/rail1";
+import { enqueueParticipantNotification } from "@/services/queues/participant-notification.queue";
 
 export async function getAllParticipants(c: Context) {
   const limit = Math.min(parseInt(c.req.query("limit") || "50"), 100);
@@ -143,6 +145,7 @@ export async function flagParticipant(c: Context) {
         userId: participantProfile.userId,
         isFlagged: participantProfile.isFlagged,
         username: participantProfile.username,
+        telegramId: participantProfile.telegramId,
       });
 
     if (!updated) {
@@ -152,6 +155,12 @@ export async function flagParticipant(c: Context) {
     console.log(
       `Admin ${admin.id} ${isFlagged ? "flagged" : "unflagged"} user ${userId}. Reason: ${reason || "none"}`,
     );
+
+    if (isFlagged && updated.telegramId) {
+      const reasonText = reason ? ` Reason: ${reason}` : "";
+      const message = `🚩 Your account has been flagged.${reasonText} Please contact support if you believe this is a mistake`;
+      await enqueueParticipantNotification(updated.telegramId, message);
+    }
 
     return c.json({
       message: `Participant ${isFlagged ? "flagged" : "unflagged"} successfully`,
@@ -239,6 +248,82 @@ export async function adjustParticipantPoints(c: Context) {
     });
   } catch (error) {
     console.error("adjustParticipantPoints.error:", error);
+    return c.json({ error: "Internal server error" }, 500);
+  }
+}
+
+export async function warnParticipant(c: Context) {
+  const admin = c.get("user") as User;
+  if (!admin || (admin.role !== "superadmin" && admin.role !== "admin")) {
+    return c.json({ error: "Admin access required" }, 403);
+  }
+
+  const participantId = c.req.param("participantId");
+  if (!participantId) {
+    return c.json({ error: "Participant ID is required" }, 400);
+  }
+
+  const { reason } = await c.req.json();
+  if (!reason) {
+    return c.json({ error: "reason is required for audit" }, 400);
+  }
+
+  try {
+    const result = await db.transaction(async (tx) => {
+      const [updated] = await tx
+        .update(participantProfile)
+        .set({
+          warningCount: sql`${participantProfile.warningCount} + 1`,
+          updatedAt: new Date(),
+        })
+        .where(eq(participantProfile.userId, participantId))
+        .returning({
+          id: participantProfile.id,
+          userId: participantProfile.userId,
+          warningCount: participantProfile.warningCount,
+          username: participantProfile.username,
+          telegramId: participantProfile.telegramId,
+        });
+
+      if (!updated) {
+        return null;
+      }
+
+      // CHANGED: use updated.id (participantProfile.id), not the userId
+      // route param, since participantWarnings.participantId references
+      // participantProfile.id.
+      await tx.insert(participantWarnings).values({
+        participantId: updated.id,
+        reason,
+        issuedBy: admin.id,
+      });
+
+      return updated;
+    });
+
+    if (!result) {
+      return c.json({ error: "Participant not found" }, 404);
+    }
+
+    console.log(
+      `Admin ${admin.id} warned user ${result.userId}. Reason: ${reason}`,
+    );
+
+    if (result.telegramId) {
+      const message = `⚠️ You have received a warning on your account.\nReason: ${reason}\n\n.Please review the community guidelines to avoid further action.`;
+      await enqueueParticipantNotification(result.telegramId, message);
+    }
+
+    return c.json({
+      message: "Participant warned successfully",
+      participant: {
+        userId: result.userId,
+        warningCount: result.warningCount,
+        username: result.username,
+      },
+    });
+  } catch (error) {
+    console.error("warnParticipant.error:", error);
     return c.json({ error: "Internal server error" }, 500);
   }
 }

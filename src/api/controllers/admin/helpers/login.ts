@@ -1,4 +1,5 @@
 import { Context } from "hono";
+import { randomInt, createHash } from "node:crypto";
 import { db } from "@/db";
 import { authUsers } from "@/db/schema/rail2";
 import { eq, or } from "drizzle-orm";
@@ -9,9 +10,56 @@ import { checkRateLimit } from "@/utils/time";
 import { sign, verify } from "hono/jwt";
 import { JWT_ALGORITHM } from "@/middleware/rail1-jwt";
 import redisClient from "@/redis";
+import { sendOtpEmail } from "@/services/email/otp";
 
 const SESSION_TTL_SECONDS = 60 * 60 * 8;
+const OTP_TTL_SECONDS = 60 * 5;
+export const MAX_OTP_ATTEMPTS = 5;
 const SECRET = Bun.env.ADMIN_SESSION_SECRET;
+
+function generateOtpCode(): string {
+  // 6-digit numeric, cryptographically random (not Math.random)
+  return randomInt(0, 1_000_000).toString().padStart(6, "0");
+}
+
+export function hashOtp(code: string): string {
+  return createHash("sha256").update(code).digest("hex");
+}
+
+// CHANGED: this replaces the old direct call to issueAdminSession from
+// handlePasswordLogin / handlePrivyLogin. It verifies identity/credentials
+// as before, but instead of issuing a session, it starts an OTP challenge.
+async function initiateOtpChallenge(
+  c: Context,
+  admin: typeof authUsers.$inferSelect,
+) {
+  if (!admin.email) {
+    // Can't OTP an admin with no email on file — decide how you want to
+    // handle this (block login, fall back to direct session, etc).
+    return c.json({ error: "No email on file for OTP verification" }, 400);
+  }
+
+  const code = generateOtpCode();
+  const pendingToken = nanoid();
+
+  await redisClient.set(
+    `otp:${pendingToken}`,
+    JSON.stringify({ adminId: admin.id, codeHash: hashOtp(code), attempts: 0 }),
+    "EX",
+    OTP_TTL_SECONDS,
+  );
+
+  await sendOtpEmail(admin.email, code);
+
+  return c.json(
+    {
+      otpRequired: true,
+      pendingToken,
+      expiresInSeconds: OTP_TTL_SECONDS,
+    },
+    200,
+  );
+}
 
 export async function handlePrivyLogin(c: Context, token: string) {
   let admin;
@@ -27,7 +75,8 @@ export async function handlePrivyLogin(c: Context, token: string) {
     return c.json({ error: "Unauthorized" }, 403);
   }
 
-  return issueAdminSession(c, admin);
+  // CHANGED: was issueAdminSession(c, admin)
+  return initiateOtpChallenge(c, admin);
 }
 
 export async function handlePasswordLogin(
@@ -58,9 +107,11 @@ export async function handlePasswordLogin(
     return c.json({ error: "Invalid credentials" }, 401);
   }
 
-  return issueAdminSession(c, admin);
+  // CHANGED: was issueAdminSession(c, admin)
+  return initiateOtpChallenge(c, admin);
 }
 
+// Unchanged — now only reachable after OTP verification succeeds.
 export async function issueAdminSession(
   c: Context,
   admin: typeof authUsers.$inferSelect,
@@ -83,7 +134,6 @@ export async function issueAdminSession(
     "Set-Cookie",
     `admin_session=${token}; HttpOnly; Secure; SameSite=None; Path=/; Max-Age=${SESSION_TTL_SECONDS}`,
   );
-
   c.set("user", admin);
 
   return c.json(
@@ -99,11 +149,6 @@ export async function issueAdminSession(
   );
 }
 
-// Clears the admin_session cookie and marks its jti revoked so the token
-// can't be replayed even if it leaked before expiry — adminSessionAuth
-// (src/middleware/auth.ts) already checks `revoked:<jti>` on every request,
-// this is the first thing that ever writes it. Idempotent: a missing or
-// already-invalid cookie is treated as "already logged out", not an error.
 export async function adminLogout(c: Context) {
   const cookie = c.req.header("cookie") ?? "";
   const token = cookie.match(/admin_session=([^;]+)/)?.[1];
@@ -124,6 +169,5 @@ export async function adminLogout(c: Context) {
     "Set-Cookie",
     "admin_session=; HttpOnly; Secure; SameSite=None; Path=/; Max-Age=0",
   );
-
   return c.json({ ok: true }, 200);
 }
