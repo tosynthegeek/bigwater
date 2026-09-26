@@ -75,7 +75,6 @@ export async function handlePrivyLogin(c: Context, token: string) {
     return c.json({ error: "Unauthorized" }, 403);
   }
 
-  // CHANGED: was issueAdminSession(c, admin)
   return initiateOtpChallenge(c, admin);
 }
 
@@ -107,7 +106,6 @@ export async function handlePasswordLogin(
     return c.json({ error: "Invalid credentials" }, 401);
   }
 
-  // CHANGED: was issueAdminSession(c, admin)
   return initiateOtpChallenge(c, admin);
 }
 
