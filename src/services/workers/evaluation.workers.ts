@@ -3,7 +3,7 @@ import type { SubmissionEvaluationJobData } from "../queues/evaluation.queue";
 import { evaluateSubmission } from "../ai/evaluate";
 import { makeConnection } from "@/redis";
 import { wireWorkerAlerts } from "@/utils/alerts";
-import { logger } from "@/utils/logger";
+import { logger } from "@/services/logger/logger";
 import { db } from "@/db";
 import { submissions } from "@/db/schema/rail2";
 import { and, eq } from "drizzle-orm";
@@ -48,7 +48,10 @@ async function releaseToManualReview(submissionId: string, err: Error) {
         aiVerdict: `AI check failed, please review manually. (${err.message.slice(0, 300)})`,
       })
       .where(
-        and(eq(submissions.id, submissionId), eq(submissions.status, "pending")),
+        and(
+          eq(submissions.id, submissionId),
+          eq(submissions.status, "pending"),
+        ),
       );
     log.warn("released to manual review after AI evaluation failed", {
       submissionId,

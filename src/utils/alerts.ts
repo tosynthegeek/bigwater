@@ -1,7 +1,7 @@
 import { Resend } from "resend";
 import type { Worker } from "bullmq";
 import redisClient from "@/redis";
-import { logger } from "@/utils/logger";
+import { logger } from "@/services/logger/logger";
 
 const log = logger.child({ source: "alerts" });
 

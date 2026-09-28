@@ -6,7 +6,7 @@ import { db } from "@/db";
 import { participantProfile } from "@/db/schema/rail2";
 import { makeConnection } from "@/redis";
 import { wireWorkerAlerts } from "@/utils/alerts";
-import { logger } from "@/utils/logger";
+import { logger } from "@/services/logger/logger";
 
 import type { MorningNotificationJobData } from "../queues/morning-notification.queue";
 

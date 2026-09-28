@@ -7,7 +7,7 @@ import { db } from "@/db";
 import { eq } from "drizzle-orm";
 import { InlineKeyboard } from "grammy";
 import { wireWorkerAlerts } from "@/utils/alerts";
-import { logger } from "@/utils/logger";
+import { logger } from "@/services/logger/logger";
 
 const log = logger.child({ source: "worker:submission-notification" });
 

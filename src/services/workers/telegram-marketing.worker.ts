@@ -8,7 +8,7 @@ import { db } from "@/db";
 import { participantProfile } from "@/db/schema/rail2";
 import { isNotNull } from "drizzle-orm";
 import { wireWorkerAlerts } from "@/utils/alerts";
-import { logger } from "@/utils/logger";
+import { logger } from "@/services/logger/logger";
 
 const log = logger.child({ source: "worker:telegram-marketing" });
 

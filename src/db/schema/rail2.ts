@@ -9,6 +9,7 @@ import {
   uuid,
   unique,
   index,
+  jsonb,
 } from "drizzle-orm/pg-core";
 import { nanoid } from "@/utils/nanoid";
 import { email } from "zod";
@@ -310,3 +311,29 @@ export const bands = pgTable("bands", {
     .notNull()
     .defaultNow(),
 });
+
+export const adminAuditLogs = pgTable(
+  "admin_audit_logs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    requestId: text("request_id"),
+    actorId: text("actor_id"), // null for unauthenticated attempts (failed login)
+    actorRole: text("actor_role"),
+    actorLabel: text("actor_label"),
+    action: text("action").notNull(), // e.g. "task.update", "auth.login.failed"
+    outcome: text("outcome").notNull(), // "success" | "failure" | "denied"
+    targetType: text("target_type"),
+    targetId: text("target_id"),
+    ip: text("ip"),
+    userAgent: text("user_agent"),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>(),
+  },
+  (t) => ({
+    actorIdx: index("admin_audit_actor_idx").on(t.actorId, t.createdAt),
+    targetIdx: index("admin_audit_target_idx").on(t.targetType, t.targetId),
+    actionIdx: index("admin_audit_action_idx").on(t.action, t.createdAt),
+  }),
+);

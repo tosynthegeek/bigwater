@@ -2,7 +2,7 @@ import { Worker, type Job } from "bullmq";
 import { db } from "@/db";
 import { makeConnection } from "@/redis";
 import { wireWorkerAlerts } from "@/utils/alerts";
-import { logger } from "@/utils/logger";
+import { logger } from "@/services/logger/logger";
 import { bankMonthlyScoreForUser } from "../economy/score";
 import {
   bankingQueue,

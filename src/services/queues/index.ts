@@ -10,7 +10,7 @@ import { healthCheckWorker } from "../workers/health-check.worker";
 import { scheduleHealthCheck } from "./health-check.queue";
 import { morningNotificationWorker } from "../workers/morning-notification.worker";
 import { scheduleMorningNotification } from "./morning-notification.queue";
-import { logger } from "@/utils/logger";
+import { logger } from "@/services/logger/logger";
 import { participantNotificationWorker } from "../workers/participant-notification.worker";
 
 const log = logger.child({ source: "queues" });

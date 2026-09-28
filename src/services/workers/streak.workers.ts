@@ -3,7 +3,7 @@ import { runStreakBreakSweep } from "../economy/streaks";
 import type { SweepJobData } from "../queues/banking.queue";
 import { Worker } from "bullmq";
 import { wireWorkerAlerts } from "@/utils/alerts";
-import { logger } from "@/utils/logger";
+import { logger } from "@/services/logger/logger";
 
 const log = logger.child({ source: "worker:streak-sweep" });
 
