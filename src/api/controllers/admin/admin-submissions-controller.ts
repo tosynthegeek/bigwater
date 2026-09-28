@@ -145,7 +145,7 @@ export async function reviewSubmission(c: Context) {
 
       const submissionResponse = {
         ...updatedSubmission,
-        participantProfileId: participantProfile.id,
+        participantProfileId: pProfile.id,
       };
 
       return submissionResponse;
@@ -217,6 +217,7 @@ export async function getReadyForReviewSubmissions(c: Context) {
         taskTitle: tasks.title,
 
         username: participantProfile.username,
+        participantId: participantProfile.id,
         walletAddress: rail1Users.walletAddress,
       })
       .from(submissions)
