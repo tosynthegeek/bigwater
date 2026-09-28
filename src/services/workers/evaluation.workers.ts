@@ -3,7 +3,7 @@ import type { SubmissionEvaluationJobData } from "../queues/evaluation.queue";
 import { evaluateSubmission } from "../ai/evaluate";
 import { makeConnection } from "@/redis";
 import { wireWorkerAlerts } from "@/utils/alerts";
-import { logger } from "@/services/logger/logger";
+import { logger } from "@/utils/logger";
 import { db } from "@/db";
 import { submissions } from "@/db/schema/rail2";
 import { and, eq } from "drizzle-orm";

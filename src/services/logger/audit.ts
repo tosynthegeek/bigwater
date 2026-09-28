@@ -1,7 +1,7 @@
 // src/services/audit.ts
 import type { Context, MiddlewareHandler } from "hono";
 import { db } from "@/db";
-import { logger } from "./logger";
+import { logger } from "../../utils/logger";
 import { adminAuditLogs } from "@/db/schema/rail2";
 
 const log = logger.child({ source: "audit" });
@@ -70,7 +70,7 @@ export function setAuditMeta(c: Context, meta: Record<string, unknown>) {
 
 /**
  * Record an admin action. Always emitted to stdout; also persisted to
- * admin_audit_logs.
+ * admin_rail2_audit_logs.
  *
  * - Without `tx`: best-effort. A DB failure is logged, never thrown.
  * - With `tx`: written inside the caller's transaction, so the audit row

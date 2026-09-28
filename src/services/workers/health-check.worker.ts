@@ -4,7 +4,7 @@ import { db } from "@/db";
 import { makeConnection } from "@/redis";
 import redisClient from "@/redis";
 import { sendCriticalAlert, wireWorkerAlerts } from "@/utils/alerts";
-import { logger } from "@/services/logger/logger";
+import { logger } from "@/utils/logger";
 
 import { bankingSweepQueue, bankingQueue } from "../queues/banking.queue";
 import { submissionEvaluationQueue } from "../queues/evaluation.queue";

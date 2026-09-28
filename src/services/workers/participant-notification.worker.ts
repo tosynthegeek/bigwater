@@ -2,7 +2,7 @@ import { Worker } from "bullmq";
 import { makeConnection } from "@/redis";
 import { bot } from "@/telegram/bot";
 import { wireWorkerAlerts } from "@/utils/alerts";
-import { logger } from "@/services/logger/logger";
+import { logger } from "@/utils/logger";
 import type { ParticipantNotificationJobData } from "../queues/participant-notification.queue";
 
 const log = logger.child({ source: "worker:participant-notification" });

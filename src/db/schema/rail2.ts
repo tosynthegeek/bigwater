@@ -313,7 +313,7 @@ export const bands = pgTable("bands", {
 });
 
 export const adminAuditLogs = pgTable(
-  "admin_audit_logs",
+  "admin_rail2_audit_logs",
   {
     id: uuid("id").primaryKey().defaultRandom(),
     createdAt: timestamp("created_at", { withTimezone: true })

@@ -6,7 +6,7 @@ import { participantProfile } from "@/db/schema/rail2";
 import { db } from "@/db";
 import { isNotNull } from "drizzle-orm";
 import { wireWorkerAlerts } from "@/utils/alerts";
-import { logger } from "@/services/logger/logger";
+import { logger } from "@/utils/logger";
 
 const log = logger.child({ source: "worker:task-notification" });
 
