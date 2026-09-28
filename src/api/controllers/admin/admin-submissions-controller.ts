@@ -91,6 +91,19 @@ export async function reviewSubmission(c: Context) {
         throw new Error("Failed to update submission status");
       }
 
+      const pProfile = await tx.query.participantProfile.findFirst({
+        where: eq(participantProfile.userId, updatedSubmission.userId),
+        columns: {
+          id: true,
+        },
+      });
+
+      if (!pProfile) {
+        throw new Error(
+          `Participant profile not found for userId ${updatedSubmission.userId}`,
+        );
+      }
+
       const previousApprovedSubmission = await tx.query.submissions.findFirst({
         where: and(
           eq(submissions.userId, submission.userId),
@@ -130,7 +143,12 @@ export async function reviewSubmission(c: Context) {
         { jobId: `notify-${updatedSubmission.id}` },
       );
 
-      return updatedSubmission;
+      const submissionResponse = {
+        ...updatedSubmission,
+        participantProfileId: participantProfile.id,
+      };
+
+      return submissionResponse;
     });
 
     return c.json({ submission: updatedSubmission });

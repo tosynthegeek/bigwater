@@ -29,6 +29,7 @@ export async function getAllParticipants(c: Context) {
         .select({
           userId: authUsers.id,
           username: participantProfile.username,
+          participantId: participantProfile.id,
           walletAddress: rail1Users.walletAddress,
           totalScore:
             sql<number>`COALESCE(${sustainabilityScore.totalScore}, 0)`.mapWith(
@@ -38,6 +39,8 @@ export async function getAllParticipants(c: Context) {
           currentStreak: userStreaks.currentStreak,
           isMember: participantProfile.isMember,
           isFlagged: participantProfile.isFlagged,
+          warningCount: participantProfile.warningCount,
+          telegramId: participantProfile.telegramId,
           status: participantProfile.status,
         })
         .from(authUsers)
