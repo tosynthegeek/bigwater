@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { warningReason } from "@/db/schema/rail2";
 
 const walletAddressSchema = z
   .string()
@@ -34,6 +35,11 @@ export const resetAdminPasswordSchema = z.object({
 
 export const revokeAdminSchema = z.object({
   id: z.string(),
+});
+
+export const warnParticipantBodySchema = z.object({
+  reason: z.enum(warningReason.enumValues),
+  note: z.string().trim().min(1).max(500),
 });
 
 export function parseIdentifier(identifier: string) {

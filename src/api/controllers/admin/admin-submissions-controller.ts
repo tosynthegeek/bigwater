@@ -278,6 +278,7 @@ export async function getApprovedAndRejectedSubmissions(c: Context) {
         taskTitle: tasks.title,
 
         username: participantProfile.username,
+        participantId: participantProfile.id,
         walletAddress: rail1Users.walletAddress,
       })
       .from(submissions)
