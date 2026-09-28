@@ -48,7 +48,10 @@ async function releaseToManualReview(submissionId: string, err: Error) {
         aiVerdict: `AI check failed, please review manually. (${err.message.slice(0, 300)})`,
       })
       .where(
-        and(eq(submissions.id, submissionId), eq(submissions.status, "pending")),
+        and(
+          eq(submissions.id, submissionId),
+          eq(submissions.status, "pending"),
+        ),
       );
     log.warn("released to manual review after AI evaluation failed", {
       submissionId,

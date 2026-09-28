@@ -43,6 +43,13 @@
       "when": 1790343760826,
       "tag": "0005_bizarre_whirlwind",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790601432881,
+      "tag": "0006_ambiguous_gauntlet",
+      "breakpoints": true
     }
   ]
 }

@@ -11,6 +11,7 @@ import { sign, verify } from "hono/jwt";
 import { JWT_ALGORITHM } from "@/middleware/rail1-jwt";
 import redisClient from "@/redis";
 import { sendOtpEmail } from "@/services/email/otp";
+import { audit } from "@/services/logger/audit";
 
 const SESSION_TTL_SECONDS = 60 * 60 * 8;
 const OTP_TTL_SECONDS = 60 * 5;
@@ -36,6 +37,11 @@ async function initiateOtpChallenge(
   if (!admin.email) {
     // Can't OTP an admin with no email on file — decide how you want to
     // handle this (block login, fall back to direct session, etc).
+    await audit(c, {
+      action: "auth.otp.no_email",
+      outcome: "failure",
+      actor: admin,
+    });
     return c.json({ error: "No email on file for OTP verification" }, 400);
   }
 
@@ -50,6 +56,14 @@ async function initiateOtpChallenge(
   );
 
   await sendOtpEmail(admin.email, code);
+
+  await audit(c, {
+    action: "auth.otp.sent",
+    outcome: "success",
+    actor: admin,
+    targetType: "admin",
+    targetId: admin.id,
+  });
 
   return c.json(
     {
@@ -68,10 +82,22 @@ export async function handlePrivyLogin(c: Context, token: string) {
     admin = await getOrcreateAdminByPrivyDid(claims.user_id);
   } catch (err) {
     console.error("[adminLogin:privy]", (err as Error)?.message);
+    await audit(c, {
+      action: "auth.login.failed",
+      outcome: "denied",
+      actor: null,
+      metadata: { method: "privy", reason: "token_invalid_or_lookup_failed" },
+    });
     return c.json({ error: "Unauthorized" }, 401);
   }
 
   if (!admin || (admin.role !== "admin" && admin.role !== "superadmin")) {
+    await audit(c, {
+      action: "auth.login.failed",
+      outcome: "denied",
+      actor: admin ?? null,
+      metadata: { method: "privy", reason: "not_admin" },
+    });
     return c.json({ error: "Unauthorized" }, 403);
   }
 
@@ -86,6 +112,12 @@ export async function handlePasswordLogin(
   try {
     await checkRateLimit(`admin-login:${identifier}`);
   } catch {
+    await audit(c, {
+      action: "auth.login.failed",
+      outcome: "denied",
+      actor: null,
+      metadata: { method: "password", identifier, reason: "rate_limited" },
+    });
     return c.json({ error: "Too many attempts, try again later" }, 429);
   }
 
@@ -96,14 +128,26 @@ export async function handlePasswordLogin(
     ),
   });
 
-  if (!admin || !admin.passwordHash || admin.status !== "active") {
+  // The client always gets the same generic 401; the audit row records the
+  // real reason internally.
+  const failLogin = async (reason: string) => {
+    await audit(c, {
+      action: "auth.login.failed",
+      outcome: "denied",
+      actor: admin ?? null,
+      metadata: { method: "password", identifier, reason },
+    });
     return c.json({ error: "Invalid credentials" }, 401);
-  }
+  };
+
+  if (!admin) return failLogin("unknown_identifier");
+  if (!admin.passwordHash) return failLogin("no_password_set");
+  if (admin.status !== "active") return failLogin("account_inactive");
   if (admin.role !== "admin" && admin.role !== "superadmin") {
-    return c.json({ error: "Invalid credentials" }, 401);
+    return failLogin("not_admin");
   }
   if (!(await Bun.password.verify(password, admin.passwordHash))) {
-    return c.json({ error: "Invalid credentials" }, 401);
+    return failLogin("bad_password");
   }
 
   return initiateOtpChallenge(c, admin);
@@ -134,6 +178,15 @@ export async function issueAdminSession(
   );
   c.set("user", admin);
 
+  await audit(c, {
+    action: "auth.login.success",
+    outcome: "success",
+    actor: admin,
+    targetType: "admin",
+    targetId: admin.id,
+    metadata: { jti },
+  });
+
   return c.json(
     {
       admin: {
@@ -158,6 +211,12 @@ export async function adminLogout(c: Context) {
       const exp = payload.exp as number;
       const ttlSeconds = Math.max(1, exp - Math.floor(Date.now() / 1000));
       await redisClient.set(`revoked:${jti}`, "1", "EX", ttlSeconds);
+      await audit(c, {
+        action: "auth.logout",
+        outcome: "success",
+        actor: { id: payload.sub as string, role: payload.role as string },
+        metadata: { jti },
+      });
     } catch {
       // Already expired/invalid/malformed — nothing to revoke.
     }
