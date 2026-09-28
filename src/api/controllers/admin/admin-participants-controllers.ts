@@ -8,7 +8,9 @@ import {
   userStreaks,
   type User,
   participantWarnings,
+  warningReason,
 } from "@/db/schema/rail2";
+import { warnParticipantBodySchema } from "@/zod/admin";
 import { db } from "@/db";
 import { and, eq, ilike, or, sql } from "drizzle-orm";
 import { format } from "date-fns";
@@ -255,6 +257,17 @@ export async function adjustParticipantPoints(c: Context) {
   }
 }
 
+const WARNING_REASON_LABELS: Record<
+  (typeof warningReason.enumValues)[number],
+  string
+> = {
+  spam: "Spam",
+  abusive_behavior: "Abusive behavior",
+  low_quality_submissions: "Low quality submissions",
+  policy_violation: "Policy violation",
+  other: "Other",
+};
+
 export async function warnParticipant(c: Context) {
   const admin = c.get("user") as User;
   if (!admin || (admin.role !== "superadmin" && admin.role !== "admin")) {
@@ -266,10 +279,11 @@ export async function warnParticipant(c: Context) {
     return c.json({ error: "Participant ID is required" }, 400);
   }
 
-  const { reason } = await c.req.json();
-  if (!reason) {
-    return c.json({ error: "reason is required for audit" }, 400);
+  const validated = warnParticipantBodySchema.safeParse(await c.req.json());
+  if (!validated.success) {
+    return c.json({ error: validated.error.issues }, 400);
   }
+  const { reason, note } = validated.data;
 
   try {
     const result = await db.transaction(async (tx) => {
@@ -279,7 +293,7 @@ export async function warnParticipant(c: Context) {
           warningCount: sql`${participantProfile.warningCount} + 1`,
           updatedAt: new Date(),
         })
-        .where(eq(participantProfile.userId, participantId))
+        .where(eq(participantProfile.id, participantId))
         .returning({
           id: participantProfile.id,
           userId: participantProfile.userId,
@@ -292,12 +306,10 @@ export async function warnParticipant(c: Context) {
         return null;
       }
 
-      // CHANGED: use updated.id (participantProfile.id), not the userId
-      // route param, since participantWarnings.participantId references
-      // participantProfile.id.
       await tx.insert(participantWarnings).values({
         participantId: updated.id,
         reason,
+        note,
         issuedBy: admin.id,
       });
 
@@ -313,13 +325,15 @@ export async function warnParticipant(c: Context) {
     );
 
     if (result.telegramId) {
-      const message = `⚠️ You have received a warning on your account.\nReason: ${reason}\n\n.Please review the community guidelines to avoid further action.`;
+      const message = `⚠️ You have received a warning on your account.\nReason: ${WARNING_REASON_LABELS[reason]}\n\n${note}\n\nPlease review the community guidelines to avoid further action.`;
       await enqueueParticipantNotification(result.telegramId, message);
     }
 
     return c.json({
       message: "Participant warned successfully",
+      notified: Boolean(result.telegramId),
       participant: {
+        participantId: result.id,
         userId: result.userId,
         warningCount: result.warningCount,
         username: result.username,
