@@ -37,9 +37,20 @@ export async function sendActiveTaskList(ctx: BotContext) {
     header += `⏳ Cooldown — next submission in ~${mins}m\n`;
   }
 
+  if (status.taskAvailability.noTasksConfigured) {
+    await ctx.reply(
+      `${header}\n\n` +
+        `There are no tasks available right now. Please check back later.`,
+      { parse_mode: "Markdown" },
+    );
+    return;
+  }
+
   if (status.availableTasks.length === 0) {
     const streak = await getUserStreak(user.id);
+
     let message: string;
+
     if (streak >= 3) {
       message =
         `${header}\n` +
@@ -51,6 +62,7 @@ export async function sendActiveTaskList(ctx: BotContext) {
         `That’s a wrap for today. Everything’s in for review, and your limit resets in 24 hours.\n` +
         `See you tomorrow. Your streak will thank you 🔥`;
     }
+
     await ctx.reply(message, { parse_mode: "Markdown" });
     return;
   }
