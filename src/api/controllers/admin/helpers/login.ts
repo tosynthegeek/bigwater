@@ -48,14 +48,23 @@ export async function handlePasswordLogin(
     ),
   });
 
-  if (!admin || !admin.passwordHash || admin.status !== "active") {
-    return c.json({ error: "Invalid credentials" }, 401);
+  if (!admin) {
+    return c.json({ error: "No account found for this identifier" }, 401);
+  }
+  if (!admin.passwordHash) {
+    return c.json(
+      { error: "Password login is not enabled for this account" },
+      401,
+    );
+  }
+  if (admin.status !== "active") {
+    return c.json({ error: "This account is inactive" }, 401);
   }
   if (admin.role !== "admin" && admin.role !== "superadmin") {
-    return c.json({ error: "Invalid credentials" }, 401);
+    return c.json({ error: "This account does not have admin access" }, 401);
   }
   if (!(await Bun.password.verify(password, admin.passwordHash))) {
-    return c.json({ error: "Invalid credentials" }, 401);
+    return c.json({ error: "Incorrect password" }, 401);
   }
 
   return issueAdminSession(c, admin);
