@@ -205,6 +205,15 @@ export async function getSubmissionLimitStatus(userId: string) {
         })
       : [];
 
+  const noTasksConfigured =
+    !dailyLimitReached && !cooldownActive && activeTasks.length === 0;
+
+  const noTasksRemaining =
+    !dailyLimitReached &&
+    !cooldownActive &&
+    activeTasks.length > 0 &&
+    availableTasks.length === 0;
+
   return {
     cooldown: {
       active: cooldownActive,
@@ -220,5 +229,10 @@ export async function getSubmissionLimitStatus(userId: string) {
     },
 
     availableTasks,
+
+    taskAvailability: {
+      noTasksConfigured,
+      noTasksRemaining,
+    },
   };
 }
