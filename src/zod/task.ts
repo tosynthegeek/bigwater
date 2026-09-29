@@ -24,4 +24,7 @@ export const setDailyTaskSelectionSchema = z.object({
     .array(z.string().min(1))
     .min(1, "Select at least one task")
     .max(MAX_DAILY_TASKS, `Cannot select more than ${MAX_DAILY_TASKS} tasks`),
+  // Defaults to true (notify on any real change). Pass false when
+  // resubmitting a quick correction you don't want re-announced.
+  notify: z.boolean().optional(),
 });

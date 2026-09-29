@@ -2,6 +2,7 @@ import { type Context } from "hono";
 import {
   createtask,
   DailySelectionError,
+  formatDailyTasksAnnouncement,
   getDailySelectionStatus,
   setDailyTaskSelection,
 } from "@/services/tasks";
@@ -11,6 +12,7 @@ import { createTaskSchema, updateTaskSchema } from "@/zod/task";
 import { setDailyTaskSelectionSchema } from "@/zod/task";
 import { eq } from "drizzle-orm";
 import { setAuditMeta } from "@/services/logger/audit";
+import { telegramMarketingQueue } from "@/services/queues/telegram-marketing.queue";
 
 export async function createTask(c: Context) {
   const body = await c.req.json();
@@ -185,12 +187,27 @@ export async function setDailyTasks(c: Context) {
   }
 
   try {
-    const selected = await setDailyTaskSelection(
+    const result = await setDailyTaskSelection(
       validated.data.taskIds,
       admin.id,
     );
-    setAuditMeta(c, { taskIds: validated.data.taskIds });
-    return c.json({ tasks: selected }, 200);
+
+    setAuditMeta(c, {
+      taskIds: validated.data.taskIds,
+      changed: result.changed,
+      notified: false,
+    });
+
+    const shouldNotify = result.changed && validated.data.notify !== false;
+    if (shouldNotify) {
+      await telegramMarketingQueue.add("broadcast", {
+        message: formatDailyTasksAnnouncement(result.tasks),
+        initiatedBy: admin.id,
+      });
+      setAuditMeta(c, { notified: true });
+    }
+
+    return c.json({ tasks: result.tasks, changed: result.changed }, 200);
   } catch (error) {
     if (error instanceof DailySelectionError) {
       return c.json({ error: error.message }, 400);

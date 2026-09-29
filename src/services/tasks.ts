@@ -134,16 +134,30 @@ export async function createtask(params: CreateTaskParams) {
 
 export class DailySelectionError extends Error {}
 
+export function formatDailyTasksAnnouncement(tasks: ActiveTask[]): string {
+  const lines = tasks
+    .map(
+      (t, i) =>
+        `${i + 1}. ${t.title} (+${t.basePoints} pts)${t.isHighValue ? " ⭐" : ""}`,
+    )
+    .join("\n");
+  return `📋 Today's tasks are live!\n\n${lines}\n\nOpen /tasks to get started.`;
+}
+
 /**
  * Replace today's task selection wholesale (delete + insert in one tx, so a
  * crash mid-write never leaves a partial day). Rejects unknown or inactive
  * task IDs, duplicates, and more than MAX_DAILY_TASKS.
+ *
+ * `changed` tells the caller whether the *set* of selected tasks actually
+ * differs from what was there before (order-insensitive) — use it to avoid
+ * re-notifying participants on a no-op resubmit or a pure reorder.
  */
 export async function setDailyTaskSelection(
   taskIds: string[],
   selectedBy: string,
   at: Date = new Date(),
-): Promise<ActiveTask[]> {
+): Promise<{ tasks: ActiveTask[]; changed: boolean }> {
   if (taskIds.length === 0) {
     throw new DailySelectionError("Must select at least one task");
   }
@@ -178,6 +192,16 @@ export async function setDailyTaskSelection(
       );
     }
 
+    const existingRows = await tx
+      .select({ taskId: dailyTaskSelections.taskId })
+      .from(dailyTaskSelections)
+      .where(eq(dailyTaskSelections.dayIndex, dayIndex));
+    const existingIds = new Set(existingRows.map((r) => r.taskId));
+    const newIds = new Set(uniqueIds);
+    const changed =
+      existingIds.size !== newIds.size ||
+      uniqueIds.some((id) => !existingIds.has(id));
+
     await tx
       .delete(dailyTaskSelections)
       .where(eq(dailyTaskSelections.dayIndex, dayIndex));
@@ -191,6 +215,7 @@ export async function setDailyTaskSelection(
       })),
     );
 
-    return selectionForDay(dayIndex, tx);
+    const selected = await selectionForDay(dayIndex, tx);
+    return { tasks: selected, changed };
   });
 }
