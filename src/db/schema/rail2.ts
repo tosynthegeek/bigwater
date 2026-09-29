@@ -18,6 +18,7 @@ export type ParticipantProfile = typeof participantProfile.$inferSelect;
 export type User = typeof authUsers.$inferSelect & {
   participantProfile?: ParticipantProfile;
 };
+export type DailyTaskSelection = typeof dailyTaskSelections.$inferSelect;
 
 export const userRole = pgEnum("user_role", ["user", "admin", "superadmin"]);
 export const submissionStatus = pgEnum("submission_status", [
@@ -336,4 +337,26 @@ export const adminAuditLogs = pgTable(
     targetIdx: index("admin_audit_target_idx").on(t.targetType, t.targetId),
     actionIdx: index("admin_audit_action_idx").on(t.action, t.createdAt),
   }),
+);
+
+export const dailyTaskSelections = pgTable(
+  "daily_task_selections",
+  {
+    id: varchar("id").primaryKey().$defaultFn(nanoid),
+    dayIndex: integer("day_index").notNull(),
+    taskId: varchar("task_id")
+      .notNull()
+      .references(() => tasks.id, { onDelete: "cascade" }),
+    order: integer("order").notNull().default(0),
+    selectedBy: varchar("selected_by").references(() => authUsers.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    unique("daily_task_selection_day_task_unique").on(t.dayIndex, t.taskId),
+    index("daily_task_selection_day_idx").on(t.dayIndex),
+  ],
 );
