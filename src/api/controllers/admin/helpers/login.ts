@@ -101,6 +101,11 @@ export async function handlePrivyLogin(c: Context, token: string) {
     return c.json({ error: "Unauthorized" }, 403);
   }
 
+  // log that OTP is sent for privy login
+  console.log(
+    `[adminLogin:privy] OTP sent to ${admin.email} for admin ID ${admin.id}`,
+  );
+
   return initiateOtpChallenge(c, admin);
 }
 
