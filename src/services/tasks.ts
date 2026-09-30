@@ -1,5 +1,5 @@
 // src/services/tasks.ts
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, lte, max } from "drizzle-orm";
 import { db } from "@/db";
 import { dailyTaskSelections, tasks } from "@/db/schema/rail2";
 import { taskQueue } from "./queues/tasks.queue";
@@ -61,25 +61,40 @@ async function selectionForDay(
 }
 
 /**
- * Today's selected tasks. Falls back to yesterday's selection if the admin
- * hasn't picked today's yet — so there's a gap between midnight and whenever
- * the admin makes their pick, not an empty list. Returns [] only if neither
- * day has a selection (e.g. before the first pick is ever made).
+ * The most recent day (<= `today`) that has a selection row, or null if the
+ * admin has never made a pick. This is what makes a selection persist across
+ * any number of days until the admin sets a new one.
+ */
+async function latestSelectionDayIndex(
+  today: number,
+  conn: DbLike = db,
+): Promise<number | null> {
+  const [row] = await conn
+    .select({ dayIndex: max(dailyTaskSelections.dayIndex) })
+    .from(dailyTaskSelections)
+    .where(lte(dailyTaskSelections.dayIndex, today));
+  return row?.dayIndex ?? null;
+}
+
+/**
+ * Today's selected tasks. If the admin hasn't picked today's yet, carries
+ * forward the most recent selection (however many days back) — tasks stay
+ * live until the admin sets a new selection. Returns [] only if a selection
+ * has never been made.
  */
 export async function getActiveTasks(
   at: Date = new Date(),
 ): Promise<ActiveTask[]> {
-  const today = currentDayIndex(at);
-  const todays = await selectionForDay(today);
-  if (todays.length > 0) return todays;
-  return selectionForDay(today - 1);
+  const latest = await latestSelectionDayIndex(currentDayIndex(at));
+  if (latest === null) return [];
+  return selectionForDay(latest);
 }
 
 /**
  * Which task IDs currently count as "available to submit to" — today's
- * selection, or yesterday's as fallback. Used to validate a submission's
- * taskId server-side rather than trusting that the client only shows what
- * getActiveTasks() returned.
+ * selection, or the most recent one carried forward. Used to validate a
+ * submission's taskId server-side rather than trusting that the client only
+ * shows what getActiveTasks() returned.
  */
 export async function getActiveTaskIds(
   at: Date = new Date(),
@@ -91,12 +106,15 @@ export async function getActiveTaskIds(
 /** Effective selection info for the admin UI: which day it's actually showing. */
 export async function getDailySelectionStatus(at: Date = new Date()) {
   const today = currentDayIndex(at);
-  const todays = await selectionForDay(today);
-  if (todays.length > 0) {
-    return { dayIndex: today, isToday: true, tasks: todays };
+  const latest = await latestSelectionDayIndex(today);
+  if (latest === null) {
+    return { dayIndex: today, isToday: false, tasks: [] as ActiveTask[] };
   }
-  const yesterdays = await selectionForDay(today - 1);
-  return { dayIndex: today - 1, isToday: false, tasks: yesterdays };
+  return {
+    dayIndex: latest,
+    isToday: latest === today,
+    tasks: await selectionForDay(latest),
+  };
 }
 
 export async function getTaskById(taskId: string) {
