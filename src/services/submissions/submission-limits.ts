@@ -7,6 +7,7 @@ import { db } from "@/db";
 import { submissions, tasks } from "@/db/schema/rail2";
 
 import { periodIndex, timeframes } from "../economy/config";
+import { getActiveTaskIds, getActiveTasks } from "@/services/tasks";
 
 export async function enforceSubmissionLimits(
   userId: string,
@@ -24,6 +25,20 @@ export async function enforceSubmissionLimits(
   if (!limits) {
     console.error("Submission limits not configured");
     throw new Error("Submission limits not configured");
+  }
+
+  // A task can be `active` (admin.updateTask never deactivated it) without
+  // being one of today's/yesterday's 5 selected tasks. Without this check a
+  // user who already knows a taskId could keep submitting to it after it
+  // rotated out of the daily list, bypassing the whole point of the daily
+  // selection — enforce it here, not just in what getActiveTasks() returns
+  // to the client.
+  const activeTaskIds = await getActiveTaskIds(now);
+  if (!activeTaskIds.has(task.id)) {
+    throw new SubmissionRejectedError(
+      "This task is not part of today's selection.",
+      400,
+    );
   }
 
   const existingTaskSubmission = await db.query.submissions.findFirst({
@@ -186,9 +201,11 @@ export async function getSubmissionLimitStatus(userId: string) {
         ),
       ),
 
-    db.query.tasks.findMany({
-      where: eq(tasks.active, true),
-    }),
+    // CHANGED: was `db.query.tasks.findMany({ where: eq(tasks.active, true) })`
+    // — every active task, regardless of the daily selection. Now sourced
+    // from the same daily-selection-aware function the /tasks endpoint and
+    // the Telegram bot use, so all three surfaces agree on "today's tasks".
+    getActiveTasks(now),
   ]);
 
   const cooldownMs = limits.cooldownHours;

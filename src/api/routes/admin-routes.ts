@@ -6,6 +6,8 @@ import {
   createTask,
   deactivateTask,
   getAllTasks,
+  getDailyTaskSelection,
+  setDailyTasks,
   updateTask,
 } from "@/api/controllers/admin/admin-tasks-controllers";
 import {
@@ -38,43 +40,139 @@ import {
   getPlatformOverview,
   sendTelegramBroadcast,
 } from "../controllers/admin/admin-services-controllers";
+import { withAudit } from "@/services/logger/audit";
 
 const AdminRouter = new Hono();
 
-AdminRouter.patch("/password", updateOwnPassword);
-AdminRouter.patch("/admins/:adminUserId/password", resetAdminPassword);
+AdminRouter.patch(
+  "/password",
+  withAudit("admin.password.change", updateOwnPassword, {
+    targetType: "admin",
+  }),
+);
+AdminRouter.patch(
+  "/admins/:adminUserId/password",
+  withAudit("admin.password.reset", resetAdminPassword, {
+    targetType: "admin",
+    targetParam: "adminUserId",
+  }),
+);
+AdminRouter.get("/admins", getAllAdmins);
+AdminRouter.post(
+  "/add",
+  withAudit("admin.add", addAdmin, { targetType: "admin" }),
+);
+AdminRouter.post(
+  "/revoke",
+  withAudit("admin.revoke", revokeAdmin, { targetType: "admin" }),
+);
+AdminRouter.get("/profile", getAdmin);
+AdminRouter.post("/logout", adminLogout); // audited inside helpers/login.ts
 
+// Tasks
 AdminRouter.get("/tasks", getAllTasks);
-AdminRouter.post("/tasks", createTask);
-AdminRouter.patch("/tasks/:id", updateTask);
-AdminRouter.patch("/tasks/:id/activate", activateTask);
-AdminRouter.patch("/tasks/:id/deactivate", deactivateTask);
+AdminRouter.post(
+  "/tasks",
+  withAudit("task.create", createTask, { targetType: "task" }),
+);
+AdminRouter.patch(
+  "/tasks/:id",
+  withAudit("task.update", updateTask, {
+    targetType: "task",
+    targetParam: "id",
+  }),
+);
+AdminRouter.patch(
+  "/tasks/:id/activate",
+  withAudit("task.activate", activateTask, {
+    targetType: "task",
+    targetParam: "id",
+  }),
+);
+AdminRouter.patch(
+  "/tasks/:id/deactivate",
+  withAudit("task.deactivate", deactivateTask, {
+    targetType: "task",
+    targetParam: "id",
+  }),
+);
+AdminRouter.get("/tasks/daily-selection", getDailyTaskSelection);
+AdminRouter.post(
+  "/tasks/daily-selection",
+  withAudit("task.daily_selection.set", setDailyTasks, {
+    targetType: "daily_task_selection",
+  }),
+);
 
 AdminRouter.get("/submission-limits", getSubmissionLimits);
-AdminRouter.patch("/submission-limits", updateSubmissionLimits);
-
+AdminRouter.patch(
+  "/submission-limits",
+  withAudit("config.submission_limits.update", updateSubmissionLimits, {
+    targetType: "submission_limits",
+  }),
+);
 AdminRouter.get("/bands", getBands);
-AdminRouter.patch("/bands/:id", updateBand);
+AdminRouter.patch(
+  "/bands/:id",
+  withAudit("config.band.update", updateBand, {
+    targetType: "band",
+    targetParam: "id",
+  }),
+);
 
+// Submissions
 AdminRouter.get("/submissions/custom", getCustomSubmissions);
-AdminRouter.delete("/submissions/:id", deleteSubmission);
+AdminRouter.delete(
+  "/submissions/:id",
+  withAudit("submission.delete", deleteSubmission, {
+    targetType: "submission",
+    targetParam: "id",
+  }),
+);
 AdminRouter.get("/submissions/review", getReadyForReviewSubmissions);
-AdminRouter.patch("/submissions/:id/review", reviewSubmission);
+AdminRouter.patch(
+  "/submissions/:id/review",
+  withAudit("submission.review", reviewSubmission, {
+    targetType: "submission",
+    targetParam: "id",
+  }),
+);
 AdminRouter.get(
   "/submissions/approved-rejected",
   getApprovedAndRejectedSubmissions,
 );
 
+// Participants
 AdminRouter.get("/participants", getAllParticipants);
-AdminRouter.post("/participants/:participantId/warn", warnParticipant);
-AdminRouter.patch("/participants/:userId/flag", flagParticipant);
-AdminRouter.post("/participants/:userId/points", adjustParticipantPoints);
-AdminRouter.get("/overview", getPlatformOverview);
-AdminRouter.get("/admins", getAllAdmins);
-AdminRouter.post("/add", addAdmin);
-AdminRouter.post("/revoke", revokeAdmin);
-AdminRouter.get("/profile", getAdmin);
-AdminRouter.post("/logout", adminLogout);
+AdminRouter.post(
+  "/participants/:participantId/warn",
+  withAudit("participant.warn", warnParticipant, {
+    targetType: "participant_profile",
+    targetParam: "participantId",
+  }),
+);
+AdminRouter.patch(
+  "/participants/:userId/flag",
+  withAudit("participant.flag", flagParticipant, {
+    targetType: "user",
+    targetParam: "userId",
+  }),
+);
+AdminRouter.post(
+  "/participants/:userId/points",
+  withAudit("participant.adjust_points", adjustParticipantPoints, {
+    targetType: "user",
+    targetParam: "userId",
+  }),
+);
 
-AdminRouter.post("/telegram/broadcast", sendTelegramBroadcast);
+// Platform
+AdminRouter.get("/overview", getPlatformOverview);
+AdminRouter.post(
+  "/telegram/broadcast",
+  withAudit("telegram.broadcast", sendTelegramBroadcast, {
+    targetType: "broadcast",
+  }),
+);
+
 export default AdminRouter;

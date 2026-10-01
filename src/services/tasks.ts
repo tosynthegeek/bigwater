@@ -1,7 +1,11 @@
-import { desc, eq } from "drizzle-orm";
+// src/services/tasks.ts
+import { and, eq, inArray, lte, max } from "drizzle-orm";
 import { db } from "@/db";
-import { tasks } from "@/db/schema/rail2";
+import { dailyTaskSelections, tasks } from "@/db/schema/rail2";
 import { taskQueue } from "./queues/tasks.queue";
+import { periodIndex, timeframes } from "@/services/economy/config";
+
+export const MAX_DAILY_TASKS = 5;
 
 export type ActiveTask = {
   id: string;
@@ -21,11 +25,96 @@ export type CreateTaskParams = {
   active?: boolean;
 };
 
-export async function getActiveTasks(): Promise<ActiveTask[]> {
-  return db.query.tasks.findMany({
-    where: eq(tasks.active, true),
-    orderBy: desc(tasks.createdAt),
-  });
+// The same day boundary submission-limits.ts uses for cooldowns and daily
+// submission counts, so "today's 5 tasks" and "today's submission window"
+// always agree on where a day starts.
+export function currentDayIndex(at: Date = new Date()): number {
+  return periodIndex(at, timeframes.dayPeriodMs);
+}
+
+type DbLike = typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+async function selectionForDay(
+  dayIndex: number,
+  conn: DbLike = db,
+): Promise<ActiveTask[]> {
+  const rows = await conn
+    .select({
+      id: tasks.id,
+      title: tasks.title,
+      description: tasks.description,
+      category: tasks.category,
+      basePoints: tasks.basePoints,
+      isHighValue: tasks.isHighValue,
+      order: dailyTaskSelections.order,
+    })
+    .from(dailyTaskSelections)
+    .innerJoin(tasks, eq(dailyTaskSelections.taskId, tasks.id))
+    // A task deactivated after being selected (deactivateTask) drops out of
+    // the live list without needing to touch the day's selection rows.
+    .where(
+      and(eq(dailyTaskSelections.dayIndex, dayIndex), eq(tasks.active, true)),
+    )
+    .orderBy(dailyTaskSelections.order);
+
+  return rows.map(({ order, ...task }) => task);
+}
+
+/**
+ * The most recent day (<= `today`) that has a selection row, or null if the
+ * admin has never made a pick. This is what makes a selection persist across
+ * any number of days until the admin sets a new one.
+ */
+async function latestSelectionDayIndex(
+  today: number,
+  conn: DbLike = db,
+): Promise<number | null> {
+  const [row] = await conn
+    .select({ dayIndex: max(dailyTaskSelections.dayIndex) })
+    .from(dailyTaskSelections)
+    .where(lte(dailyTaskSelections.dayIndex, today));
+  return row?.dayIndex ?? null;
+}
+
+/**
+ * Today's selected tasks. If the admin hasn't picked today's yet, carries
+ * forward the most recent selection (however many days back) — tasks stay
+ * live until the admin sets a new selection. Returns [] only if a selection
+ * has never been made.
+ */
+export async function getActiveTasks(
+  at: Date = new Date(),
+): Promise<ActiveTask[]> {
+  const latest = await latestSelectionDayIndex(currentDayIndex(at));
+  if (latest === null) return [];
+  return selectionForDay(latest);
+}
+
+/**
+ * Which task IDs currently count as "available to submit to" — today's
+ * selection, or the most recent one carried forward. Used to validate a
+ * submission's taskId server-side rather than trusting that the client only
+ * shows what getActiveTasks() returned.
+ */
+export async function getActiveTaskIds(
+  at: Date = new Date(),
+): Promise<Set<string>> {
+  const active = await getActiveTasks(at);
+  return new Set(active.map((t) => t.id));
+}
+
+/** Effective selection info for the admin UI: which day it's actually showing. */
+export async function getDailySelectionStatus(at: Date = new Date()) {
+  const today = currentDayIndex(at);
+  const latest = await latestSelectionDayIndex(today);
+  if (latest === null) {
+    return { dayIndex: today, isToday: false, tasks: [] as ActiveTask[] };
+  }
+  return {
+    dayIndex: latest,
+    isToday: latest === today,
+    tasks: await selectionForDay(latest),
+  };
 }
 
 export async function getTaskById(taskId: string) {
@@ -59,4 +148,92 @@ export async function createtask(params: CreateTaskParams) {
   });
 
   return task;
+}
+
+export class DailySelectionError extends Error {}
+
+export function formatDailyTasksAnnouncement(tasks: ActiveTask[]): string {
+  const lines = tasks
+    .map(
+      (t, i) =>
+        `${i + 1}. ${t.title} (+${t.basePoints} pts)${t.isHighValue ? " ⭐" : ""}`,
+    )
+    .join("\n");
+  return `📋 Today's tasks are live!\n\n${lines}\n\nOpen /tasks to get started.`;
+}
+
+/**
+ * Replace today's task selection wholesale (delete + insert in one tx, so a
+ * crash mid-write never leaves a partial day). Rejects unknown or inactive
+ * task IDs, duplicates, and more than MAX_DAILY_TASKS.
+ *
+ * `changed` tells the caller whether the *set* of selected tasks actually
+ * differs from what was there before (order-insensitive) — use it to avoid
+ * re-notifying participants on a no-op resubmit or a pure reorder.
+ */
+export async function setDailyTaskSelection(
+  taskIds: string[],
+  selectedBy: string,
+  at: Date = new Date(),
+): Promise<{ tasks: ActiveTask[]; changed: boolean }> {
+  if (taskIds.length === 0) {
+    throw new DailySelectionError("Must select at least one task");
+  }
+  if (taskIds.length > MAX_DAILY_TASKS) {
+    throw new DailySelectionError(
+      `Cannot select more than ${MAX_DAILY_TASKS} tasks`,
+    );
+  }
+
+  const uniqueIds = Array.from(new Set(taskIds));
+  if (uniqueIds.length !== taskIds.length) {
+    throw new DailySelectionError("Duplicate task IDs in selection");
+  }
+
+  const dayIndex = currentDayIndex(at);
+
+  return db.transaction(async (tx) => {
+    const found = await tx.query.tasks.findMany({
+      where: inArray(tasks.id, uniqueIds),
+    });
+
+    if (found.length !== uniqueIds.length) {
+      const foundIds = new Set(found.map((t) => t.id));
+      const missing = uniqueIds.filter((id) => !foundIds.has(id));
+      throw new DailySelectionError(`Unknown task IDs: ${missing.join(", ")}`);
+    }
+
+    const inactive = found.filter((t) => !t.active);
+    if (inactive.length > 0) {
+      throw new DailySelectionError(
+        `Cannot select inactive tasks: ${inactive.map((t) => t.title).join(", ")}`,
+      );
+    }
+
+    const existingRows = await tx
+      .select({ taskId: dailyTaskSelections.taskId })
+      .from(dailyTaskSelections)
+      .where(eq(dailyTaskSelections.dayIndex, dayIndex));
+    const existingIds = new Set(existingRows.map((r) => r.taskId));
+    const newIds = new Set(uniqueIds);
+    const changed =
+      existingIds.size !== newIds.size ||
+      uniqueIds.some((id) => !existingIds.has(id));
+
+    await tx
+      .delete(dailyTaskSelections)
+      .where(eq(dailyTaskSelections.dayIndex, dayIndex));
+
+    await tx.insert(dailyTaskSelections).values(
+      uniqueIds.map((taskId, i) => ({
+        dayIndex,
+        taskId,
+        order: i,
+        selectedBy,
+      })),
+    );
+
+    const selected = await selectionForDay(dayIndex, tx);
+    return { tasks: selected, changed };
+  });
 }

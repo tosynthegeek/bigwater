@@ -47,21 +47,49 @@ export async function getUserScoreSummary(userId: string) {
       currentStreak: userStreaks.currentStreak,
       longestStreak: userStreaks.longestStreak,
 
-      globalRank: sql<number>`(
-      SELECT rank FROM (
-        SELECT
-          pp2.user_id,
-          RANK() OVER (
-            ORDER BY (COALESCE(ss2.total_score, 0) + COALESCE(r1_2.total_points, 0)) DESC
-          ) AS rank
-        FROM participant_profile pp2
-        LEFT JOIN sustainability_score ss2 ON ss2.user_id = pp2.user_id
-        LEFT JOIN users r1_2 ON r1_2.id = pp2.rail1_user_id
-      ) ranked
-      WHERE ranked.user_id = ${userId}
-    )`
+      globalRank: sql<number>`
+        (
+          SELECT rank
+          FROM (
+            SELECT
+              u.id AS user_id,
+              RANK() OVER (
+                ORDER BY (
+                  COALESCE(ss.total_score, 0)
+                  + COALESCE(r1.total_points, 0)
+                ) DESC
+              ) AS rank
+            FROM users r1
+            FULL JOIN participant_profile pp
+              ON pp.rail1_user_id = r1.id
+            LEFT JOIN auth_accounts u
+              ON u.id = pp.user_id
+            LEFT JOIN sustainability_score ss
+              ON ss.user_id = u.id
+          ) ranked
+          WHERE ranked.user_id = ${userId}
+        )
+      `
         .mapWith(Number)
         .as("global_rank"),
+      rail2Rank: sql<number>`
+        (
+          SELECT rank
+          FROM (
+            SELECT
+              pp2.user_id,
+              RANK() OVER (
+                ORDER BY COALESCE(ss2.total_score, 0) DESC
+              ) AS rank
+            FROM participant_profile pp2
+            LEFT JOIN sustainability_score ss2
+              ON ss2.user_id = pp2.user_id
+          ) ranked
+          WHERE ranked.user_id = ${userId}
+        )
+      `
+        .mapWith(Number)
+        .as("rail2_rank"),
     })
     .from(participantProfile)
     .where(eq(participantProfile.userId, userId))

@@ -13,6 +13,7 @@ import { updateUserStreak } from "@/services/economy/streaks";
 import { rail1Users } from "@/db/schema/rail1";
 import { relevanceRes } from "@/services/ai/relevance";
 import { submissionNotificationQueue } from "@/services/queues/notification.queue";
+import { setAuditMeta } from "@/services/logger/audit";
 
 class ReviewError extends Error {
   constructor(
@@ -156,6 +157,12 @@ export async function reviewSubmission(c: Context) {
       };
 
       return submissionResponse;
+    });
+
+    setAuditMeta(c, {
+      decision: status,
+      submissionUserId: updatedSubmission.userId,
+      taskId: updatedSubmission.taskId,
     });
 
     return c.json({ submission: updatedSubmission });
