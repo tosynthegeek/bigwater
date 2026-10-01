@@ -127,7 +127,6 @@ export async function handlePasswordLogin(
       eq(authUsers.username, identifier),
     ),
   });
-
   // The client always gets the same generic 401; the audit row records the
   // real reason internally.
   const failLogin = async (reason: string) => {
