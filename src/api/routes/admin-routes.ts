@@ -6,6 +6,8 @@ import {
   createTask,
   deactivateTask,
   getAllTasks,
+  getDailyTaskSelection,
+  setDailyTasks,
   updateTask,
 } from "@/api/controllers/admin/admin-tasks-controllers";
 import {
@@ -94,8 +96,14 @@ AdminRouter.patch(
     targetParam: "id",
   }),
 );
+AdminRouter.get("/tasks/daily-selection", getDailyTaskSelection);
+AdminRouter.post(
+  "/tasks/daily-selection",
+  withAudit("task.daily_selection.set", setDailyTasks, {
+    targetType: "daily_task_selection",
+  }),
+);
 
-// Config
 AdminRouter.get("/submission-limits", getSubmissionLimits);
 AdminRouter.patch(
   "/submission-limits",
