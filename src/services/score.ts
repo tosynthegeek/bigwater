@@ -17,6 +17,7 @@ export async function getUserScoreSummary(userId: string) {
   const [profile] = await db
     .select({
       userId: participantProfile.userId,
+      participantId: participantProfile.id,
       username: participantProfile.username,
       isMember: participantProfile.isMember,
       isFlagged: participantProfile.isFlagged,

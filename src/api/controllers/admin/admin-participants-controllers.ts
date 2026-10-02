@@ -7,13 +7,17 @@ import {
   authUsers,
   userStreaks,
   type User,
+  participantWarnings,
+  warningReason,
 } from "@/db/schema/rail2";
+import { warnParticipantBodySchema } from "@/zod/admin";
 import { db } from "@/db";
 import { and, eq, ilike, or, sql } from "drizzle-orm";
 import { format } from "date-fns";
 import { getBandForMonthlyTally } from "@/services/economy/bands";
 import { getTallyPeriod } from "@/services/economy/tally";
 import { rail1Users } from "@/db/schema/rail1";
+import { enqueueParticipantNotification } from "@/services/queues/participant-notification.queue";
 
 export async function getAllParticipants(c: Context) {
   const limit = Math.min(parseInt(c.req.query("limit") || "50"), 100);
@@ -27,6 +31,7 @@ export async function getAllParticipants(c: Context) {
         .select({
           userId: authUsers.id,
           username: participantProfile.username,
+          participantId: participantProfile.id,
           walletAddress: rail1Users.walletAddress,
           totalScore:
             sql<number>`COALESCE(${sustainabilityScore.totalScore}, 0)`.mapWith(
@@ -36,6 +41,8 @@ export async function getAllParticipants(c: Context) {
           currentStreak: userStreaks.currentStreak,
           isMember: participantProfile.isMember,
           isFlagged: participantProfile.isFlagged,
+          warningCount: participantProfile.warningCount,
+          telegramId: participantProfile.telegramId,
           status: participantProfile.status,
         })
         .from(authUsers)
@@ -143,6 +150,7 @@ export async function flagParticipant(c: Context) {
         userId: participantProfile.userId,
         isFlagged: participantProfile.isFlagged,
         username: participantProfile.username,
+        telegramId: participantProfile.telegramId,
       });
 
     if (!updated) {
@@ -152,6 +160,12 @@ export async function flagParticipant(c: Context) {
     console.log(
       `Admin ${admin.id} ${isFlagged ? "flagged" : "unflagged"} user ${userId}. Reason: ${reason || "none"}`,
     );
+
+    if (isFlagged && updated.telegramId) {
+      const reasonText = reason ? ` Reason: ${reason}` : "";
+      const message = `🚩 Your account has been flagged.${reasonText} Please contact support if you believe this is a mistake`;
+      await enqueueParticipantNotification(updated.telegramId, message);
+    }
 
     return c.json({
       message: `Participant ${isFlagged ? "flagged" : "unflagged"} successfully`,
@@ -239,6 +253,94 @@ export async function adjustParticipantPoints(c: Context) {
     });
   } catch (error) {
     console.error("adjustParticipantPoints.error:", error);
+    return c.json({ error: "Internal server error" }, 500);
+  }
+}
+
+const WARNING_REASON_LABELS: Record<
+  (typeof warningReason.enumValues)[number],
+  string
+> = {
+  spam: "Spam",
+  abusive_behavior: "Abusive behavior",
+  low_quality_submissions: "Low quality submissions",
+  policy_violation: "Policy violation",
+  other: "Other",
+};
+
+export async function warnParticipant(c: Context) {
+  const admin = c.get("user") as User;
+  if (!admin || (admin.role !== "superadmin" && admin.role !== "admin")) {
+    return c.json({ error: "Admin access required" }, 403);
+  }
+
+  const participantId = c.req.param("participantId");
+  if (!participantId) {
+    return c.json({ error: "Participant ID is required" }, 400);
+  }
+
+  const validated = warnParticipantBodySchema.safeParse(await c.req.json());
+  if (!validated.success) {
+    return c.json({ error: validated.error.issues }, 400);
+  }
+  const { reason, note } = validated.data;
+
+  try {
+    const result = await db.transaction(async (tx) => {
+      const [updated] = await tx
+        .update(participantProfile)
+        .set({
+          warningCount: sql`${participantProfile.warningCount} + 1`,
+          updatedAt: new Date(),
+        })
+        .where(eq(participantProfile.id, participantId))
+        .returning({
+          id: participantProfile.id,
+          userId: participantProfile.userId,
+          warningCount: participantProfile.warningCount,
+          username: participantProfile.username,
+          telegramId: participantProfile.telegramId,
+        });
+
+      if (!updated) {
+        return null;
+      }
+
+      await tx.insert(participantWarnings).values({
+        participantId: updated.id,
+        reason,
+        note,
+        issuedBy: admin.id,
+      });
+
+      return updated;
+    });
+
+    if (!result) {
+      return c.json({ error: "Participant not found" }, 404);
+    }
+
+    console.log(
+      `Admin ${admin.id} warned user ${result.userId}. Reason: ${reason}`,
+    );
+
+    if (result.telegramId) {
+      const message = `⚠️ You have received a warning on your account.\nReason: ${WARNING_REASON_LABELS[reason]}\n\n${note}\n\nPlease review the community guidelines to avoid further action.`;
+      await enqueueParticipantNotification(result.telegramId, message);
+    }
+
+    return c.json({
+      message: "Participant warned successfully",
+      notified: Boolean(result.telegramId),
+      participant: {
+        participantId: result.id,
+        userId: result.userId,
+        warningCount: result.warningCount,
+        username: result.username,
+      },
+    });
+  } catch (error) {
+    console.error("warnParticipant.error:", error);
     return c.json({ error: "Internal server error" }, 500);
   }
 }

@@ -44,9 +44,9 @@ export function registerStartHandler(bot: Bot<BotContext>) {
       );
 
       await ctx.reply(
-        `Welcome back, ${username}! 👋\n\n` +
-          `You've got ${remaining} submissions left today, and every approved one grows your score for good.\n\n` +
-          "Pick a task below, or /help for the full menu.",
+        `Welcome back, ${username} to $BIGW!👋\n\n` +
+          `You've got ${remaining} submissions today. Act now and do your bit to Impact and Earn. Be the Sustainability Warrior that walks the talk. \n\n` +
+          "Pick a task below or click /help for the full menu.",
       );
 
       await sendActiveTaskList(ctx);
@@ -73,9 +73,10 @@ export function registerStartHandler(bot: Bot<BotContext>) {
     }
 
     await ctx.reply(
-      `Hey ${username}👋 Welcome to BigWater\n\n` +
-        "Here's how this works: pick a task, do it in real life, send one photo as proof. A real person checks it, and your Sustainability Score goes up. It never comes back down.\n\n" +
-        "Send /tasks to see what you can submit today, or /help for the full menu.",
+      `Hey ${username}👋 Welcome to the world of BigWater!🌊\n\n` +
+        "Here's how this works: type /tasks, pick your task, do it in real life, upload a pic. A real person supported by our AI engine checks it. Once your pic is approved, you get a Sustainability Score.\n\n" +
+        "If rejected, try again. Do 5 tasks every day, every month and get a 3x multiplier on your score.\n" +
+        "Be the Sustainability Warrior that Acts, Impacts, Earns $BIGW.",
     );
     await sendActiveTaskList(ctx);
   });

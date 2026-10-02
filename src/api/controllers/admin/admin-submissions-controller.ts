@@ -13,6 +13,16 @@ import { updateUserStreak } from "@/services/economy/streaks";
 import { rail1Users } from "@/db/schema/rail1";
 import { relevanceRes } from "@/services/ai/relevance";
 import { submissionNotificationQueue } from "@/services/queues/notification.queue";
+import { setAuditMeta } from "@/services/logger/audit";
+
+class ReviewError extends Error {
+  constructor(
+    public status: 400 | 404 | 409,
+    message: string,
+  ) {
+    super(message);
+  }
+}
 
 export async function reviewSubmission(c: Context) {
   const user = c.get("user");
@@ -43,20 +53,13 @@ export async function reviewSubmission(c: Context) {
       });
 
       if (!submission) {
-        return c.json(
-          {
-            error: `Submission ${submissionId} not found`,
-          },
-          404,
-        );
+        throw new ReviewError(404, `Submission ${submissionId} not found`);
       }
 
       if (submission.status !== "under_review") {
-        return c.json(
-          {
-            error: `Submission not ready for review, current status ${submission.status}`,
-          },
+        throw new ReviewError(
           409,
+          `Submission not ready for review, current status ${submission.status}`,
         );
       }
 
@@ -66,7 +69,7 @@ export async function reviewSubmission(c: Context) {
         });
 
         if (!task) {
-          return c.json({ error: "Invalid task ID for submission" }, 400);
+          throw new ReviewError(400, "Invalid task ID for submission");
         }
 
         await processApprovedSubmission(
@@ -84,11 +87,29 @@ export async function reviewSubmission(c: Context) {
           status,
           updatedAt: new Date(),
         })
-        .where(eq(submissions.id, submission.id))
+        .where(
+          and(
+            eq(submissions.id, submission.id),
+            eq(submissions.status, "under_review"),
+          ),
+        )
         .returning();
 
       if (!updatedSubmission) {
-        throw new Error("Failed to update submission status");
+        throw new ReviewError(409, "Submission was already reviewed");
+      }
+
+      const pProfile = await tx.query.participantProfile.findFirst({
+        where: eq(participantProfile.userId, updatedSubmission.userId),
+        columns: {
+          id: true,
+        },
+      });
+
+      if (!pProfile) {
+        throw new Error(
+          `Participant profile not found for userId ${updatedSubmission.userId}`,
+        );
       }
 
       const previousApprovedSubmission = await tx.query.submissions.findFirst({
@@ -123,17 +144,32 @@ export async function reviewSubmission(c: Context) {
           userId: updatedSubmission.userId,
           taskId: updatedSubmission.taskId,
           status: updatedSubmission.status,
+          verdict: updatedSubmission.aiVerdict,
           isFirstSubmission,
           isFirstApprovedSubmission,
         },
         { jobId: `notify-${updatedSubmission.id}` },
       );
 
-      return updatedSubmission;
+      const submissionResponse = {
+        ...updatedSubmission,
+        participantProfileId: pProfile.id,
+      };
+
+      return submissionResponse;
+    });
+
+    setAuditMeta(c, {
+      decision: status,
+      submissionUserId: updatedSubmission.userId,
+      taskId: updatedSubmission.taskId,
     });
 
     return c.json({ submission: updatedSubmission });
   } catch (error) {
+    if (error instanceof ReviewError) {
+      return c.json({ error: error.message }, error.status);
+    }
     console.error(
       "Submissions.Controllers.updateSubmissionStatus.error: ",
       error,
@@ -198,6 +234,7 @@ export async function getReadyForReviewSubmissions(c: Context) {
         taskTitle: tasks.title,
 
         username: participantProfile.username,
+        participantId: participantProfile.id,
         walletAddress: rail1Users.walletAddress,
       })
       .from(submissions)
@@ -258,6 +295,7 @@ export async function getApprovedAndRejectedSubmissions(c: Context) {
         taskTitle: tasks.title,
 
         username: participantProfile.username,
+        participantId: participantProfile.id,
         walletAddress: rail1Users.walletAddress,
       })
       .from(submissions)

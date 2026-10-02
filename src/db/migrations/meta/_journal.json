@@ -36,6 +36,27 @@
       "when": 1786453349654,
       "tag": "0004_salty_katie_power",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1790343760826,
+      "tag": "0005_bizarre_whirlwind",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790601432881,
+      "tag": "0006_ambiguous_gauntlet",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1790668533100,
+      "tag": "0007_overrated_triathlon",
+      "breakpoints": true
     }
   ]
 }

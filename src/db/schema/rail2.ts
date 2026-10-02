@@ -9,6 +9,7 @@ import {
   uuid,
   unique,
   index,
+  jsonb,
 } from "drizzle-orm/pg-core";
 import { nanoid } from "@/utils/nanoid";
 import { email } from "zod";
@@ -17,6 +18,7 @@ export type ParticipantProfile = typeof participantProfile.$inferSelect;
 export type User = typeof authUsers.$inferSelect & {
   participantProfile?: ParticipantProfile;
 };
+export type DailyTaskSelection = typeof dailyTaskSelections.$inferSelect;
 
 export const userRole = pgEnum("user_role", ["user", "admin", "superadmin"]);
 export const submissionStatus = pgEnum("submission_status", [
@@ -28,6 +30,13 @@ export const submissionStatus = pgEnum("submission_status", [
 export const submissionSource = pgEnum("submission_source", [
   "web",
   "telegram",
+]);
+export const warningReason = pgEnum("warning_reason", [
+  "spam",
+  "abusive_behavior",
+  "low_quality_submissions",
+  "policy_violation",
+  "other",
 ]);
 
 export const authUsers = pgTable("auth_accounts", {
@@ -58,11 +67,27 @@ export const participantProfile = pgTable("participant_profile", {
   telegramId: text("telegram_id").unique(),
   isMember: boolean("is_member").notNull().default(false),
   isFlagged: boolean("is_flagged").notNull().default(false),
+  warningCount: integer("warning_count").notNull().default(0),
   status: text("status").notNull().default("active"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
   updatedAt: timestamp("updated_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+
+export const participantWarnings = pgTable("participant_warnings", {
+  id: varchar("id").primaryKey().$defaultFn(nanoid),
+  participantId: varchar("participant_id")
+    .notNull()
+    .references(() => participantProfile.id, { onDelete: "cascade" }),
+  reason: warningReason("reason").notNull(),
+  note: text("note"),
+  issuedBy: varchar("issued_by").references(() => authUsers.id, {
+    onDelete: "set null",
+  }),
+  createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
 });
@@ -287,3 +312,51 @@ export const bands = pgTable("bands", {
     .notNull()
     .defaultNow(),
 });
+
+export const adminAuditLogs = pgTable(
+  "admin_rail2_audit_logs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    requestId: text("request_id"),
+    actorId: text("actor_id"), // null for unauthenticated attempts (failed login)
+    actorRole: text("actor_role"),
+    actorLabel: text("actor_label"),
+    action: text("action").notNull(), // e.g. "task.update", "auth.login.failed"
+    outcome: text("outcome").notNull(), // "success" | "failure" | "denied"
+    targetType: text("target_type"),
+    targetId: text("target_id"),
+    ip: text("ip"),
+    userAgent: text("user_agent"),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>(),
+  },
+  (t) => ({
+    actorIdx: index("admin_audit_actor_idx").on(t.actorId, t.createdAt),
+    targetIdx: index("admin_audit_target_idx").on(t.targetType, t.targetId),
+    actionIdx: index("admin_audit_action_idx").on(t.action, t.createdAt),
+  }),
+);
+
+export const dailyTaskSelections = pgTable(
+  "daily_task_selections",
+  {
+    id: varchar("id").primaryKey().$defaultFn(nanoid),
+    dayIndex: integer("day_index").notNull(),
+    taskId: varchar("task_id")
+      .notNull()
+      .references(() => tasks.id, { onDelete: "cascade" }),
+    order: integer("order").notNull().default(0),
+    selectedBy: varchar("selected_by").references(() => authUsers.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    unique("daily_task_selection_day_task_unique").on(t.dayIndex, t.taskId),
+    index("daily_task_selection_day_idx").on(t.dayIndex),
+  ],
+);

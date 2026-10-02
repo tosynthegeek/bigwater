@@ -10,6 +10,7 @@ import { registerScoreHandler } from "./handlers/score";
 import { registerHelpHandler } from "./handlers/help";
 import { registerCancelHandler } from "./handlers/cancel";
 import { registerFallbackHandler } from "./handlers/fallback";
+import { registerMultipliersHandler } from "./handlers/multiplier";
 
 let started = false;
 
@@ -36,6 +37,7 @@ export function startTelegramBot() {
   registerSubmissionsHandlers(bot);
   registerScoreHandler(bot);
   registerHelpHandler(bot);
+  registerMultipliersHandler(bot);
   registerCancelHandler(bot);
 
   registerFallbackHandler(bot);

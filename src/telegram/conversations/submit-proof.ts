@@ -41,8 +41,8 @@ export async function submitProofConversation(
     `🌍 *${task.title}*\n\n` +
       `${task.description}\n\n` +
       `Worth: ${task.basePoints} points \n\n` +
-      `*Done? Send one photo that clearly shows the work. The reviewer goes by what they can see, so get the whole thing in frame.*\n\n` +
-      `Changed your mind? /cancel anytime, no hard feelings.`,
+      `*Done? Send a clear pic now. Good work must be rewarded🎁.*\n\n` +
+      `Wanna do later? /cancel anytime. No hard feelings 🤗`,
     { parse_mode: "Markdown" },
   );
 
@@ -57,10 +57,8 @@ export async function submitProofConversation(
 
   if (!photo?.file_id) {
     await ctx.reply(
-      "That file won’t work here.\n\n" +
-        "Proof needs to be a photo: JPEG or PNG, " +
-        "Send it again or send /cancel to step out." +
-        "Send /help if you need help.",
+      "Sorry!! That file won’t work. Pic needs to be JPEG or PNG only. Try sending again.\n\n" +
+        "Send /help for the full menu.",
     );
     return;
   }
@@ -101,16 +99,18 @@ export async function submitProofConversation(
 
     if (isFirstSubmission) {
       await ctx.reply(
-        "That’s your first proof in 🌊\n\n" +
-          "It’s off to a real human for review, so give it a little time. We’ll ping you the moment there’s a verdict.\n\n" +
-          `Meanwhile, you’ve still got ${remaining} submissions today. Send /tasks if you’re on a roll, or /help for the full menu.`,
+        "That’s your first good deed of the day🌊\n\n" +
+          "Now over to our manned AI engine for review. Standby for the verdict.\n\n" +
+          `Meanwhile, you still have ${remaining} submissions today. Send /tasks or /help for the full menu. Keep the streak going.`,
       );
       return;
     }
 
     await ctx.reply(
-      "Photo’s in 🌊 Off to review it goes.\n\n" +
-        `We’ll message you the verdict. ${remaining} left today, send /tasks to keep the streak alive, or /help for the full menu.`,
+      "Submitted!!! 📮\n" +
+        "Now under review.\n\n" +
+        "Standby for the verdict.👨‍🎓\n" +
+        `${remaining} left today. Send /tasks to keep the momentum going or /help for the full menu`,
     );
   } catch (error) {
     console.error("Error creating submission:", error);

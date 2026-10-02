@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { warningReason } from "@/db/schema/rail2";
 
 const walletAddressSchema = z
   .string()
@@ -6,20 +7,9 @@ const walletAddressSchema = z
   .regex(/^0x[a-fA-F0-9]{40}$/, "Not a valid EVM wallet address")
   .transform((v) => v.toLowerCase());
 
-const emailSchema = z
-  .email("Not a valid email")
-  .transform((v) => v.toLowerCase());
-
-const identifierSchema = z.union([
-  emailSchema.transform((email) => ({
-    email,
-    walletAddress: undefined as string | undefined,
-  })),
-  walletAddressSchema.transform((walletAddress) => ({
-    email: undefined as string | undefined,
-    walletAddress,
-  })),
-]);
+const identifierSchema = z.object({
+  email: z.email("Not a valid email").transform((v) => v.toLowerCase()),
+});
 
 export const addAdminBodySchema = z.discriminatedUnion("method", [
   z.object({
@@ -45,6 +35,11 @@ export const resetAdminPasswordSchema = z.object({
 
 export const revokeAdminSchema = z.object({
   id: z.string(),
+});
+
+export const warnParticipantBodySchema = z.object({
+  reason: z.enum(warningReason.enumValues),
+  note: z.string().trim().min(1).max(500),
 });
 
 export function parseIdentifier(identifier: string) {

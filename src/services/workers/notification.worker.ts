@@ -18,6 +18,7 @@ export const notificationWorker = new Worker(
       userId,
       taskId,
       status,
+      verdict,
       isFirstSubmission,
       isFirstApprovedSubmission,
     } = job.data;
@@ -30,6 +31,12 @@ export const notificationWorker = new Worker(
       log.error("user not found for notification", { userId });
       return;
     }
+
+    const feedback = verdict?.trim();
+
+    const feedbackMessage = feedback
+      ? `💡 Reviewer feedback:\n${feedback}\n\n`
+      : "";
 
     if (!user?.telegramId) return;
 
@@ -46,9 +53,11 @@ export const notificationWorker = new Worker(
     if (status === "approved") {
       if (isFirstApprovedSubmission) {
         message =
-          `✅ Your first approval. Welcome to the record.\n\n` +
-          `+${points} points on your Sustainability Score, and here's the best part: it never drops.\n\n` +
-          `/score to see it. /tasks for the next one.`;
+          `✅ Your first approval. Welcome to the Sustainability Ledger.\n\n` +
+          `+${points} points on your Sustainability Score, and you know what? It never drops.\n\n` +
+          `/score to see it. /tasks for the next one.` +
+          `/tasks for the remaining ones` +
+          `/multipliers to know how to compound your score`;
       } else {
         message =
           `✅ Approved: ${task.title}\n\n` +
@@ -60,12 +69,13 @@ export const notificationWorker = new Worker(
         `❌ This one didn’t make it. Happens to the best of us.\n\n` +
         `Nine times out of ten it means the photo didn’t clearly show the task done. ` +
         `Your Score is untouched, and the task is still open.\n\n` +
+        `${feedbackMessage}` +
         `Tap Resubmit and send a clearer shot.`;
     } else {
       message =
         `❌ Not this time either.\n\n` +
-        `Quick tip: get the whole task in frame, in decent light. ` +
-        `The reviewer can only approve what they can see.\n\n` +
+        `Get the whole task in a well-lit, single frame. The reviewer must be able to see your good work.\n\n` +
+        `${feedbackMessage}` +
         `Resubmit whenever you’re ready.`;
     }
 

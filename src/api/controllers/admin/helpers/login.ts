@@ -1,4 +1,5 @@
 import { Context } from "hono";
+import { randomInt, createHash } from "node:crypto";
 import { db } from "@/db";
 import { authUsers } from "@/db/schema/rail2";
 import { eq, or } from "drizzle-orm";
@@ -9,9 +10,70 @@ import { checkRateLimit } from "@/utils/time";
 import { sign, verify } from "hono/jwt";
 import { JWT_ALGORITHM } from "@/middleware/rail1-jwt";
 import redisClient from "@/redis";
+import { sendOtpEmail } from "@/services/email/otp";
+import { audit } from "@/services/logger/audit";
 
 const SESSION_TTL_SECONDS = 60 * 60 * 8;
+const OTP_TTL_SECONDS = 60 * 5;
+export const MAX_OTP_ATTEMPTS = 5;
 const SECRET = Bun.env.ADMIN_SESSION_SECRET;
+
+function generateOtpCode(): string {
+  // 6-digit numeric, cryptographically random (not Math.random)
+  return randomInt(0, 1_000_000).toString().padStart(6, "0");
+}
+
+export function hashOtp(code: string): string {
+  return createHash("sha256").update(code).digest("hex");
+}
+
+// CHANGED: this replaces the old direct call to issueAdminSession from
+// handlePasswordLogin / handlePrivyLogin. It verifies identity/credentials
+// as before, but instead of issuing a session, it starts an OTP challenge.
+async function initiateOtpChallenge(
+  c: Context,
+  admin: typeof authUsers.$inferSelect,
+) {
+  if (!admin.email) {
+    // Can't OTP an admin with no email on file — decide how you want to
+    // handle this (block login, fall back to direct session, etc).
+    await audit(c, {
+      action: "auth.otp.no_email",
+      outcome: "failure",
+      actor: admin,
+    });
+    return c.json({ error: "No email on file for OTP verification" }, 400);
+  }
+
+  const code = generateOtpCode();
+  const pendingToken = nanoid();
+
+  await redisClient.set(
+    `otp:${pendingToken}`,
+    JSON.stringify({ adminId: admin.id, codeHash: hashOtp(code), attempts: 0 }),
+    "EX",
+    OTP_TTL_SECONDS,
+  );
+
+  await sendOtpEmail(admin.email, code);
+
+  await audit(c, {
+    action: "auth.otp.sent",
+    outcome: "success",
+    actor: admin,
+    targetType: "admin",
+    targetId: admin.id,
+  });
+
+  return c.json(
+    {
+      otpRequired: true,
+      pendingToken,
+      expiresInSeconds: OTP_TTL_SECONDS,
+    },
+    200,
+  );
+}
 
 export async function handlePrivyLogin(c: Context, token: string) {
   let admin;
@@ -20,14 +82,31 @@ export async function handlePrivyLogin(c: Context, token: string) {
     admin = await getOrcreateAdminByPrivyDid(claims.user_id);
   } catch (err) {
     console.error("[adminLogin:privy]", (err as Error)?.message);
+    await audit(c, {
+      action: "auth.login.failed",
+      outcome: "denied",
+      actor: null,
+      metadata: { method: "privy", reason: "token_invalid_or_lookup_failed" },
+    });
     return c.json({ error: "Unauthorized" }, 401);
   }
 
   if (!admin || (admin.role !== "admin" && admin.role !== "superadmin")) {
+    await audit(c, {
+      action: "auth.login.failed",
+      outcome: "denied",
+      actor: admin ?? null,
+      metadata: { method: "privy", reason: "not_admin" },
+    });
     return c.json({ error: "Unauthorized" }, 403);
   }
 
-  return issueAdminSession(c, admin);
+  // log that OTP is sent for privy login
+  console.log(
+    `[adminLogin:privy] OTP sent to ${admin.email} for admin ID ${admin.id}`,
+  );
+
+  return initiateOtpChallenge(c, admin);
 }
 
 export async function handlePasswordLogin(
@@ -38,6 +117,12 @@ export async function handlePasswordLogin(
   try {
     await checkRateLimit(`admin-login:${identifier}`);
   } catch {
+    await audit(c, {
+      action: "auth.login.failed",
+      outcome: "denied",
+      actor: null,
+      metadata: { method: "password", identifier, reason: "rate_limited" },
+    });
     return c.json({ error: "Too many attempts, try again later" }, 429);
   }
 
@@ -47,29 +132,32 @@ export async function handlePasswordLogin(
       eq(authUsers.username, identifier),
     ),
   });
+  // The client always gets the same generic 401; the audit row records the
+  // real reason internally.
+  const failLogin = async (reason: string) => {
+    await audit(c, {
+      action: "auth.login.failed",
+      outcome: "denied",
+      actor: admin ?? null,
+      metadata: { method: "password", identifier, reason },
+    });
+    return c.json({ error: "Invalid credentials" }, 401);
+  };
 
-  if (!admin) {
-    return c.json({ error: "No account found for this identifier" }, 401);
-  }
-  if (!admin.passwordHash) {
-    return c.json(
-      { error: "Password login is not enabled for this account" },
-      401,
-    );
-  }
-  if (admin.status !== "active") {
-    return c.json({ error: "This account is inactive" }, 401);
-  }
+  if (!admin) return failLogin("unknown_identifier");
+  if (!admin.passwordHash) return failLogin("no_password_set");
+  if (admin.status !== "active") return failLogin("account_inactive");
   if (admin.role !== "admin" && admin.role !== "superadmin") {
-    return c.json({ error: "This account does not have admin access" }, 401);
+    return failLogin("not_admin");
   }
   if (!(await Bun.password.verify(password, admin.passwordHash))) {
-    return c.json({ error: "Incorrect password" }, 401);
+    return failLogin("bad_password");
   }
 
-  return issueAdminSession(c, admin);
+  return initiateOtpChallenge(c, admin);
 }
 
+// Unchanged — now only reachable after OTP verification succeeds.
 export async function issueAdminSession(
   c: Context,
   admin: typeof authUsers.$inferSelect,
@@ -92,8 +180,16 @@ export async function issueAdminSession(
     "Set-Cookie",
     `admin_session=${token}; HttpOnly; Secure; SameSite=None; Path=/; Max-Age=${SESSION_TTL_SECONDS}`,
   );
-
   c.set("user", admin);
+
+  await audit(c, {
+    action: "auth.login.success",
+    outcome: "success",
+    actor: admin,
+    targetType: "admin",
+    targetId: admin.id,
+    metadata: { jti },
+  });
 
   return c.json(
     {
@@ -108,11 +204,6 @@ export async function issueAdminSession(
   );
 }
 
-// Clears the admin_session cookie and marks its jti revoked so the token
-// can't be replayed even if it leaked before expiry — adminSessionAuth
-// (src/middleware/auth.ts) already checks `revoked:<jti>` on every request,
-// this is the first thing that ever writes it. Idempotent: a missing or
-// already-invalid cookie is treated as "already logged out", not an error.
 export async function adminLogout(c: Context) {
   const cookie = c.req.header("cookie") ?? "";
   const token = cookie.match(/admin_session=([^;]+)/)?.[1];
@@ -124,6 +215,12 @@ export async function adminLogout(c: Context) {
       const exp = payload.exp as number;
       const ttlSeconds = Math.max(1, exp - Math.floor(Date.now() / 1000));
       await redisClient.set(`revoked:${jti}`, "1", "EX", ttlSeconds);
+      await audit(c, {
+        action: "auth.logout",
+        outcome: "success",
+        actor: { id: payload.sub as string, role: payload.role as string },
+        metadata: { jti },
+      });
     } catch {
       // Already expired/invalid/malformed — nothing to revoke.
     }
@@ -133,6 +230,5 @@ export async function adminLogout(c: Context) {
     "Set-Cookie",
     "admin_session=; HttpOnly; Secure; SameSite=None; Path=/; Max-Age=0",
   );
-
   return c.json({ ok: true }, 200);
 }
