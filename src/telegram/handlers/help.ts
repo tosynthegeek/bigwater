@@ -5,12 +5,12 @@ import type { BotContext } from "@/telegram/bot";
 export function registerHelpHandler(bot: Bot<BotContext>) {
   bot.command("help", async (ctx) => {
     await ctx.reply(
-      `*Here’s everything I can do:*\n\n` +
-        `/tasks – today’s tasks and what you’ve got left\n` +
-        `/limits – quick check on your daily limit\n` +
-        `/score – your Score, streak and rank\n` +
-        `/cancel – stop whatever we’re doing\n` +
-        `/help – this menu\n\n` +
+      `*Welcome!! Here’s the full menu of actions:*\n\n` +
+        `/tasks – List of good actions for the day 📜\n` +
+        `/limits – Quick check on your daily limit 🙅\n` +
+        `/score – Your Score, Streak, Rank 🥇🥈🥉\n` +
+        `/cancel – Stop! ⛔But would you?\n` +
+        `/help – Full menu 📝\n\n` +
         `And if a submission gets rejected, the Resubmit button will be waiting right under it.\n\n`,
       { parse_mode: "Markdown" },
     );
