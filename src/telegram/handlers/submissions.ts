@@ -23,7 +23,7 @@ export function registerSubmissionsHandlers(bot: Bot<BotContext>) {
       .text("⏳ In Review", "submissions:under_review")
       .row()
       .text("🕐 Pending", "submissions:pending");
-    await ctx.reply("Your track record. Which pile do you want to see?", {
+    await ctx.reply("Your track record. Select one", {
       reply_markup: keyboard,
     });
   });
@@ -54,9 +54,9 @@ export function registerSubmissionsHandlers(bot: Bot<BotContext>) {
 
       const header =
         status === "approved"
-          ? `✅ Approved · ${count}. On the record, permanently:`
+          ? `✅ Approved · ${count}. On the Sustainability Ledger, permanently!`
           : status === "rejected"
-            ? `❌ Rejected · ${count}. All of these can be redone:`
+            ? `❌ Rejected · ${count}. Can be resubmitted.`
             : status === "under_review"
               ? `⏳ In review · ${count}. A reviewer has these, nothing needed from you:`
               : `🕐 Pending · ${count}. These are waiting to be reviewed:`;

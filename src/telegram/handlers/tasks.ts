@@ -30,7 +30,13 @@ export async function sendActiveTaskList(ctx: BotContext) {
     status.today.submissionsLimit - status.today.submissionsUsed,
   );
 
-  let header = `📊 Today: ${status.today.submissionsUsed}/${status.today.submissionsLimit} used · *${remaining} left*\n`;
+  let header = `📊 Today: ${status.today.submissionsUsed}/${status.today.submissionsLimit}`;
+
+  if (remaining > 0) {
+    header += ` used· *${remaining} left*\n`;
+  } else {
+    header += ` Done!!\n`;
+  }
 
   if (status.cooldown.active) {
     const mins = Math.ceil(status.cooldown.remainingSeconds / 60);
@@ -59,8 +65,8 @@ export async function sendActiveTaskList(ctx: BotContext) {
     } else {
       message =
         `${header}\n` +
-        `That’s a wrap for today. Everything’s in for review, and your limit resets in 24 hours.\n` +
-        `See you tomorrow. Your streak will thank you 🔥`;
+        `That’s a wrap for the day. Congratulations!\n` +
+        `Your limit resets tomorrow. Keep the streak going⚡️`;
     }
 
     await ctx.reply(message, { parse_mode: "Markdown" });
@@ -75,7 +81,7 @@ export async function sendActiveTaskList(ctx: BotContext) {
   const prompt =
     remaining === 1
       ? "Last one of the day. Make it count:"
-      : `What good are we doing today? Pick one:`;
+      : `What’s your good deed for the day? Pick one - /tasks`;
 
   await ctx.reply(header + `\n${prompt}`, {
     parse_mode: "Markdown",

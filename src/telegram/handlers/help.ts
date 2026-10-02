@@ -11,7 +11,8 @@ export function registerHelpHandler(bot: Bot<BotContext>) {
         `/score – Your Score, Streak, Rank 🥇🥈🥉\n` +
         `/cancel – Stop! ⛔But would you?\n` +
         `/help – Full menu 📝\n\n` +
-        `And if a submission gets rejected, the Resubmit button will be waiting right under it.\n\n`,
+        `/multipliers – Applied to your score every month🌪️` +
+        `And if a submission gets rejected, don’t feel dejected. Try again. You cannot give up. 🦾\n\n`,
       { parse_mode: "Markdown" },
     );
   });
