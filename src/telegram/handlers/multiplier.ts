@@ -2,32 +2,40 @@ import type { Bot } from "grammy";
 import type { BotContext } from "@/telegram/bot";
 import { getBands } from "@/services/economy/bands";
 
+const COMMENTS: Record<string, string> = {
+  Seedling: "Nah!! 🤨",
+  Growing: "You can do better. 😊",
+  Thriving: "Good effort!! 😃",
+  Flourishing: "The Planet owes you. 🌏",
+  Regenerative: "Voila! You’re a Superhero 👨‍🎤👩‍🎤",
+};
+
+const NAME_W = 13;
+const SCORE_W = 10;
+const MULT_W = 5;
+
 export function registerMultipliersHandler(bot: Bot<BotContext>) {
   bot.command("multipliers", async (ctx) => {
     const bands = await getBands();
 
-    const comments: Record<string, string> = {
-      Seedling: "Nah!! 🤨",
-      Growing: "You can do better. 😊",
-      Thriving: "Good effort!! 😃",
-      Flourishing: "The Planet owes you. 🌏",
-      Regenerative: "Voila! You’re a Superhero 👨‍🎤👩‍🎤",
-    };
-
     let text =
       `🌪️ *Information for /multipliers*\n\n` +
       "```text\n" +
-      "Band          Score       Multiplier   Comment at Month end\n" +
-      "------------------------------------------------------------\n";
+      `${"Band".padEnd(NAME_W)}${"Score".padEnd(SCORE_W)}${"Mult".padEnd(MULT_W)}\n` +
+      `${"-".repeat(NAME_W + SCORE_W + MULT_W)}\n`;
 
     for (const band of bands) {
       const multiplier = band.multiplier / 100;
+      const comment = COMMENTS[band.name];
 
       text +=
-        `${band.name.padEnd(14)}` +
-        `${`${band.minPoints}-${band.maxPoints}`.padEnd(12)}` +
-        `${`${multiplier}x`.padEnd(13)}` +
-        `${comments[band.name] ?? ""}\n`;
+        `${band.name.padEnd(NAME_W)}` +
+        `${`${band.minPoints}-${band.maxPoints}`.padEnd(SCORE_W)}` +
+        `${`${multiplier}x`.padEnd(MULT_W)}\n`;
+
+      if (comment) {
+        text += `  ↳ ${comment}\n`;
+      }
     }
 
     text += "```\n\n";
