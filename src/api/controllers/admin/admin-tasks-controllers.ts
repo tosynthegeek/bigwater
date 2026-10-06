@@ -11,7 +11,7 @@ import {
   setWeeklyTemplateDay,
 } from "@/services/tasks";
 import { db } from "@/db";
-import { tasks, type User } from "@/db/schema/rail2";
+import { submissions, tasks, type User } from "@/db/schema/rail2";
 import {
   createTaskSchema,
   setTaskScheduleSchema,
@@ -19,7 +19,7 @@ import {
   updateTaskSchema,
 } from "@/zod/task";
 import { setDailyTaskSelectionSchema } from "@/zod/task";
-import { eq } from "drizzle-orm";
+import { count, eq } from "drizzle-orm";
 import { setAuditMeta } from "@/services/logger/audit";
 import { telegramMarketingQueue } from "@/services/queues/telegram-marketing.queue";
 
@@ -122,6 +122,57 @@ export async function deactivateTask(c: Context) {
       "AdminTasks.Controllers.deactivateTaskController.error: ",
       error,
     );
+
+    return c.json({ error: "Internal server error" }, 500);
+  }
+}
+
+export async function deleteTask(c: Context) {
+  const taskId = c.req.param("id");
+
+  if (!taskId) {
+    return c.json({ error: "Task ID is required" }, 400);
+  }
+
+  try {
+    const existingTask = await db.query.tasks.findFirst({
+      where: eq(tasks.id, taskId),
+    });
+
+    if (!existingTask) {
+      return c.json({ error: "Task not found" }, 404);
+    }
+
+    // submissions.task_id is NOT NULL but its FK is ON DELETE SET NULL, so
+    // deleting a task that has submissions would fail at the database. Refuse
+    // up front with a useful error; such tasks can only be deactivated, which
+    // also keeps submission and points history intact.
+    const [submissionCount] = await db
+      .select({ n: count() })
+      .from(submissions)
+      .where(eq(submissions.taskId, taskId));
+
+    if ((submissionCount?.n ?? 0) > 0) {
+      return c.json(
+        {
+          error:
+            "Task has submissions and cannot be deleted. Deactivate it instead.",
+          submissionCount: submissionCount?.n,
+        },
+        409,
+      );
+    }
+
+    // daily_task_selections, scheduled_task_selections and
+    // weekly_task_templates reference tasks with ON DELETE CASCADE, so this
+    // also removes the task from any selection, schedule or weekly template.
+    await db.delete(tasks).where(eq(tasks.id, taskId));
+
+    setAuditMeta(c, { title: existingTask.title });
+
+    return c.json({ deleted: true, id: taskId }, 200);
+  } catch (error) {
+    console.error("AdminTasks.Controllers.deleteTaskController.error: ", error);
 
     return c.json({ error: "Internal server error" }, 500);
   }

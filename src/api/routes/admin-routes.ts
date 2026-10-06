@@ -5,6 +5,7 @@ import {
   activateTask,
   createTask,
   deactivateTask,
+  deleteTask,
   getAllTasks,
   getDailyTaskSelection,
   getTaskSchedule,
@@ -96,6 +97,13 @@ AdminRouter.patch(
 AdminRouter.patch(
   "/tasks/:id/deactivate",
   withAudit("task.deactivate", deactivateTask, {
+    targetType: "task",
+    targetParam: "id",
+  }),
+);
+AdminRouter.delete(
+  "/tasks/:id",
+  withAudit("task.delete", deleteTask, {
     targetType: "task",
     targetParam: "id",
   }),
