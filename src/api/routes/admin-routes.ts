@@ -5,9 +5,14 @@ import {
   activateTask,
   createTask,
   deactivateTask,
+  deleteTask,
   getAllTasks,
   getDailyTaskSelection,
+  getTaskSchedule,
+  getWeeklyTaskTemplate,
   setDailyTasks,
+  setTaskSchedule,
+  setWeeklyTaskTemplate,
   updateTask,
 } from "@/api/controllers/admin/admin-tasks-controllers";
 import {
@@ -96,11 +101,36 @@ AdminRouter.patch(
     targetParam: "id",
   }),
 );
+AdminRouter.delete(
+  "/tasks/:id",
+  withAudit("task.delete", deleteTask, {
+    targetType: "task",
+    targetParam: "id",
+  }),
+);
 AdminRouter.get("/tasks/daily-selection", getDailyTaskSelection);
 AdminRouter.post(
   "/tasks/daily-selection",
   withAudit("task.daily_selection.set", setDailyTasks, {
     targetType: "daily_task_selection",
+  }),
+);
+
+// Dated schedule: body { date: "YYYY-MM-DD", taskIds: [...] } (empty = clear)
+AdminRouter.get("/tasks/schedule", getTaskSchedule);
+AdminRouter.post(
+  "/tasks/schedule",
+  withAudit("task.schedule.set", setTaskSchedule, {
+    targetType: "scheduled_task_selection",
+  }),
+);
+
+// Weekly loop: body { weekday: 0-6 (0 = Sunday), taskIds: [...] } (empty = clear)
+AdminRouter.get("/tasks/weekly-template", getWeeklyTaskTemplate);
+AdminRouter.post(
+  "/tasks/weekly-template",
+  withAudit("task.weekly_template.set", setWeeklyTaskTemplate, {
+    targetType: "weekly_task_template",
   }),
 );
 
