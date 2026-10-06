@@ -10,10 +10,11 @@ const TIMEFRAMES: LeaderboardTimeframe[] = ["global", "weekly", "monthly"];
 function parsePagination(c: Context) {
   const rawLimit = parseInt(c.req.query("limit") ?? "", 10);
   const rawOffset = parseInt(c.req.query("offset") ?? "", 10);
+
   return {
     limit: Math.min(
       Math.max(Number.isFinite(rawLimit) ? rawLimit : 50, 1),
-      100,
+      500,
     ),
     offset: Math.max(Number.isFinite(rawOffset) ? rawOffset : 0, 0),
   };

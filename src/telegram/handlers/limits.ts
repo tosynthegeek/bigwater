@@ -28,16 +28,27 @@ export function registerLimitsHandler(bot: Bot<BotContext>) {
       status.today.submissionsLimit - status.today.submissionsUsed,
     );
 
+    if (remaining === 0) {
+      const text =
+        `📊 Today: ${status.today.submissionsUsed}/${status.today.submissionsLimit} submitted *${remaining} left*\n\n` +
+        `🏆 High Value – ${status.today.highValueUsed}/${status.today.highValueLimit}\n\n` +
+        `You’re such a champion ❤️\n\n` +
+        `See you tomorrow 👋`;
+
+      await ctx.reply(text, { parse_mode: "Markdown" });
+      return;
+    }
+
     let text =
       `📊 Today: ${status.today.submissionsUsed}/${status.today.submissionsLimit} submissions used (${remaining} remaining)\n` +
-      `High-value: ${status.today.highValueUsed}/${status.today.highValueLimit}`;
+      `🏆 High Value: ${status.today.highValueUsed}/${status.today.highValueLimit}`;
 
     if (status.cooldown.active) {
       const mins = Math.ceil(status.cooldown.remainingSeconds / 60);
       text += `\n⏳ Cooldown active — next submission available in ~${mins}m`;
     }
 
-    text += `\n\n Everything resets every 24 hours.`;
+    text += `\n\nWhat’s next? Pick one - /tasks`;
 
     await ctx.reply(text);
   });
