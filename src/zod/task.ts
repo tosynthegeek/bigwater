@@ -28,3 +28,20 @@ export const setDailyTaskSelectionSchema = z.object({
   // resubmitting a quick correction you don't want re-announced.
   notify: z.boolean().optional(),
 });
+
+// Dated schedule. An empty taskIds array clears the schedule for that date.
+export const setTaskScheduleSchema = z.object({
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD"),
+  taskIds: z
+    .array(z.string().min(1))
+    .max(MAX_DAILY_TASKS, `Cannot select more than ${MAX_DAILY_TASKS} tasks`),
+});
+
+// Weekly loop. weekday: 0 = Sunday ... 6 = Saturday. An empty taskIds array
+// removes the template for that weekday.
+export const setWeeklyTemplateSchema = z.object({
+  weekday: z.number().int().min(0).max(6),
+  taskIds: z
+    .array(z.string().min(1))
+    .max(MAX_DAILY_TASKS, `Cannot select more than ${MAX_DAILY_TASKS} tasks`),
+});

@@ -360,3 +360,53 @@ export const dailyTaskSelections = pgTable(
     index("daily_task_selection_day_idx").on(t.dayIndex),
   ],
 );
+
+// One-off schedule: "on this specific day, use this set". Same day-index
+// convention as dailyTaskSelections. Copied into dailyTaskSelections by
+// materializeDay() when that day starts; takes precedence over the weekly
+// template for that day.
+export const scheduledTaskSelections = pgTable(
+  "scheduled_task_selections",
+  {
+    id: varchar("id").primaryKey().$defaultFn(nanoid),
+    dayIndex: integer("day_index").notNull(),
+    taskId: varchar("task_id")
+      .notNull()
+      .references(() => tasks.id, { onDelete: "cascade" }),
+    order: integer("order").notNull().default(0),
+    createdBy: varchar("created_by").references(() => authUsers.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    unique("scheduled_task_selection_day_task_unique").on(t.dayIndex, t.taskId),
+    index("scheduled_task_selection_day_idx").on(t.dayIndex),
+  ],
+);
+
+// Recurring weekly loop: "every <weekday>, use this set". weekday is
+// 0 = Sunday ... 6 = Saturday. A weekday with no rows has no template.
+export const weeklyTaskTemplates = pgTable(
+  "weekly_task_templates",
+  {
+    id: varchar("id").primaryKey().$defaultFn(nanoid),
+    weekday: integer("weekday").notNull(),
+    taskId: varchar("task_id")
+      .notNull()
+      .references(() => tasks.id, { onDelete: "cascade" }),
+    order: integer("order").notNull().default(0),
+    updatedBy: varchar("updated_by").references(() => authUsers.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (t) => [
+    unique("weekly_task_template_weekday_task_unique").on(t.weekday, t.taskId),
+    index("weekly_task_template_weekday_idx").on(t.weekday),
+  ],
+);
