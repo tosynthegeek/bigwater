@@ -5,7 +5,6 @@ import {
   dailyTaskSelections,
   scheduledTaskSelections,
   tasks,
-  weeklyTaskTemplates,
 } from "@/db/schema/rail2";
 import { taskQueue } from "./queues/tasks.queue";
 import { periodIndex, timeframes } from "@/services/economy/config";
@@ -40,22 +39,14 @@ export function currentDayIndex(at: Date = new Date()): number {
 }
 
 // ---------------------------------------------------------------------------
-// Day index <-> calendar date / weekday.
+// Day index <-> calendar date.
 //
-// ASSUMPTION (periodIndex's implementation was not visible when writing
-// this): a day index is floor(epochMs / dayPeriodMs) with dayPeriodMs =
-// 86_400_000, i.e. days start at 00:00 UTC. weekdayForDayIndex and
-// dateForDayIndex rely on that. dayIndexForDate goes through periodIndex, so
-// it stays consistent with the rest of the codebase either way. If day
-// boundaries are not UTC midnight, these three helpers are the only code that
-// needs to change.
+// dayIndexForDate goes through periodIndex, so it always agrees with the rest
+// of the codebase. dateForDayIndex is its inverse: with the default config
+// (dayPeriodMs = 24h, epoch-aligned, so days start at 00:00 UTC) it returns
+// the UTC calendar date of the day; with a DAY_PERIOD_MS override it returns
+// the date of that day's start instant.
 // ---------------------------------------------------------------------------
-const EPOCH_WEEKDAY = 4; // 1970-01-01 was a Thursday (0 = Sunday)
-
-export function weekdayForDayIndex(dayIndex: number): number {
-  return (((dayIndex + EPOCH_WEEKDAY) % 7) + 7) % 7;
-}
-
 export function dateForDayIndex(dayIndex: number): string {
   return new Date(dayIndex * timeframes.dayPeriodMs).toISOString().slice(0, 10);
 }
@@ -122,7 +113,7 @@ async function latestSelectionDayIndex(
  * live until the admin sets a new selection. Returns [] only if a selection
  * has never been made.
  *
- * Scheduled / weekly-template sets reach this path by being materialized into
+ * A dated schedule reaches this path by being materialized into
  * dailyTaskSelections (see materializeDay); until that runs for a new day,
  * this shows the previous selection.
  */
@@ -374,82 +365,15 @@ export async function listScheduledSelections(at: Date = new Date()) {
   }));
 }
 
-/**
- * Set (replace) the recurring set for one weekday (0 = Sunday ... 6 =
- * Saturday). An empty `taskIds` removes the template for that weekday.
- * Only affects days that haven't been materialized yet — today's rows, if
- * already created, are untouched.
- */
-export async function setWeeklyTemplateDay(
-  weekday: number,
-  taskIds: string[],
-  updatedBy: string,
-): Promise<{ weekday: number; taskIds: string[] }> {
-  if (!Number.isInteger(weekday) || weekday < 0 || weekday > 6) {
-    throw new DailySelectionError("weekday must be an integer from 0 to 6");
-  }
-  const uniqueIds = normalizeTaskIds(taskIds);
-
-  await db.transaction(async (tx) => {
-    await assertTasksSelectable(uniqueIds, tx);
-
-    await tx
-      .delete(weeklyTaskTemplates)
-      .where(eq(weeklyTaskTemplates.weekday, weekday));
-
-    if (uniqueIds.length > 0) {
-      await tx.insert(weeklyTaskTemplates).values(
-        uniqueIds.map((taskId, i) => ({
-          weekday,
-          taskId,
-          order: i,
-          updatedBy,
-        })),
-      );
-    }
-  });
-
-  return { weekday, taskIds: uniqueIds };
-}
-
-/** All seven weekdays (0 = Sunday), each with its template tasks (maybe empty). */
-export async function getWeeklyTemplate() {
-  const rows = await db
-    .select({
-      weekday: weeklyTaskTemplates.weekday,
-      order: weeklyTaskTemplates.order,
-      id: tasks.id,
-      title: tasks.title,
-      description: tasks.description,
-      category: tasks.category,
-      basePoints: tasks.basePoints,
-      isHighValue: tasks.isHighValue,
-      active: tasks.active,
-    })
-    .from(weeklyTaskTemplates)
-    .innerJoin(tasks, eq(weeklyTaskTemplates.taskId, tasks.id))
-    .orderBy(weeklyTaskTemplates.weekday, weeklyTaskTemplates.order);
-
-  const days: { weekday: number; tasks: ScheduledTask[] }[] = Array.from(
-    { length: 7 },
-    (_, weekday) => ({ weekday, tasks: [] }),
-  );
-  for (const { weekday, order, ...task } of rows) {
-    days[weekday]?.tasks.push(task);
-  }
-  return days;
-}
-
 // ---------------------------------------------------------------------------
-// Materialization: turn a schedule / template into today's real selection.
+// Materialization: turn a dated schedule into today's real selection.
 // ---------------------------------------------------------------------------
 
 /**
- * If today has no selection rows yet, build one from (in order of
- * precedence) the dated schedule for today, then the weekly template for
- * today's weekday, and insert it into dailyTaskSelections. Inactive tasks are
- * skipped. Does nothing if today already has rows (manual picks always win)
- * or if neither source has any active tasks (carry-forward then applies).
+ * If today has no selection rows yet, build one from the dated schedule for
+ * today and insert it into dailyTaskSelections. Inactive tasks are skipped.
+ * Does nothing if today already has rows (manual picks always win) or if the
+ * schedule has no active tasks for today (carry-forward then applies).
  *
  * Idempotent: safe to run repeatedly or concurrently — the
  * (dayIndex, taskId) unique constraint plus onConflictDoNothing means a second
@@ -458,7 +382,7 @@ export async function getWeeklyTemplate() {
 export async function materializeDay(at: Date = new Date()): Promise<{
   dayIndex: number;
   created: boolean;
-  source: "scheduled" | "weekly" | null;
+  source: "scheduled" | null;
 }> {
   const dayIndex = currentDayIndex(at);
 
@@ -470,8 +394,7 @@ export async function materializeDay(at: Date = new Date()): Promise<{
   if (existing) return { dayIndex, created: false, source: null };
 
   return db.transaction(async (tx) => {
-    let source: "scheduled" | "weekly" = "scheduled";
-    let picks = await tx
+    const picks = await tx
       .select({ taskId: scheduledTaskSelections.taskId })
       .from(scheduledTaskSelections)
       .innerJoin(tasks, eq(scheduledTaskSelections.taskId, tasks.id))
@@ -482,21 +405,6 @@ export async function materializeDay(at: Date = new Date()): Promise<{
         ),
       )
       .orderBy(scheduledTaskSelections.order);
-
-    if (picks.length === 0) {
-      source = "weekly";
-      picks = await tx
-        .select({ taskId: weeklyTaskTemplates.taskId })
-        .from(weeklyTaskTemplates)
-        .innerJoin(tasks, eq(weeklyTaskTemplates.taskId, tasks.id))
-        .where(
-          and(
-            eq(weeklyTaskTemplates.weekday, weekdayForDayIndex(dayIndex)),
-            eq(tasks.active, true),
-          ),
-        )
-        .orderBy(weeklyTaskTemplates.order);
-    }
 
     if (picks.length === 0) return { dayIndex, created: false, source: null };
 
@@ -513,7 +421,11 @@ export async function materializeDay(at: Date = new Date()): Promise<{
       .onConflictDoNothing()
       .returning({ id: dailyTaskSelections.id });
 
-    return { dayIndex, created: inserted.length > 0, source };
+    return {
+      dayIndex,
+      created: inserted.length > 0,
+      source: "scheduled" as const,
+    };
   });
 }
 

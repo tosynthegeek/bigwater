@@ -36,12 +36,3 @@ export const setTaskScheduleSchema = z.object({
     .array(z.string().min(1))
     .max(MAX_DAILY_TASKS, `Cannot select more than ${MAX_DAILY_TASKS} tasks`),
 });
-
-// Weekly loop. weekday: 0 = Sunday ... 6 = Saturday. An empty taskIds array
-// removes the template for that weekday.
-export const setWeeklyTemplateSchema = z.object({
-  weekday: z.number().int().min(0).max(6),
-  taskIds: z
-    .array(z.string().min(1))
-    .max(MAX_DAILY_TASKS, `Cannot select more than ${MAX_DAILY_TASKS} tasks`),
-});
