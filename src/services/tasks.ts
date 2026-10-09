@@ -11,6 +11,8 @@ import { periodIndex, timeframes } from "@/services/economy/config";
 
 export const MAX_DAILY_TASKS = 5;
 
+const REAL_DAY_MS = 24 * 60 * 60 * 1000;
+
 export class DailySelectionError extends Error {}
 
 export type ActiveTask = {
@@ -38,6 +40,20 @@ export function currentDayIndex(at: Date = new Date()): number {
   return periodIndex(at, timeframes.dayPeriodMs);
 }
 
+/**
+ * True when a "day" is a real 24h day (prod default). When false (e.g.
+ * DAY_PERIOD_MS=300000 on staging) calendar dates stop being a meaningful way
+ * to address a day, because many staging days share one calendar date.
+ */
+export function isRealDayLength(): boolean {
+  return timeframes.dayPeriodMs === REAL_DAY_MS;
+}
+
+/** The instant a given day index starts. */
+export function dayStartsAt(dayIndex: number): Date {
+  return new Date(dayIndex * timeframes.dayPeriodMs);
+}
+
 // ---------------------------------------------------------------------------
 // Day index <-> calendar date.
 //
@@ -45,10 +61,10 @@ export function currentDayIndex(at: Date = new Date()): number {
 // of the codebase. dateForDayIndex is its inverse: with the default config
 // (dayPeriodMs = 24h, epoch-aligned, so days start at 00:00 UTC) it returns
 // the UTC calendar date of the day; with a DAY_PERIOD_MS override it returns
-// the date of that day's start instant.
+// the date of that day's start instant (NOT unique per day — use dayIndex).
 // ---------------------------------------------------------------------------
 export function dateForDayIndex(dayIndex: number): string {
-  return new Date(dayIndex * timeframes.dayPeriodMs).toISOString().slice(0, 10);
+  return dayStartsAt(dayIndex).toISOString().slice(0, 10);
 }
 
 export function dayIndexForDate(date: string): number {
@@ -61,6 +77,55 @@ export function dayIndexForDate(date: string): number {
     throw new DailySelectionError("Invalid date, expected YYYY-MM-DD");
   }
   return periodIndex(d, timeframes.dayPeriodMs);
+}
+
+/**
+ * A schedule target. Exactly one of:
+ * - date: "YYYY-MM-DD" (real 24h days only)
+ * - dayOffset: periods from the current one (1 = next period). Resolved
+ *   against server time at request time, so it can shift by one if a boundary
+ *   passes between the admin viewing the list and submitting.
+ * - dayIndex: absolute day index (deterministic; preferred for tests)
+ */
+export type ScheduleTarget =
+  | string
+  | { date?: string; dayIndex?: number; dayOffset?: number };
+
+function resolveScheduleDayIndex(
+  target: ScheduleTarget,
+  today: number,
+): number {
+  const t = typeof target === "string" ? { date: target } : target;
+  const provided = [t.date, t.dayIndex, t.dayOffset].filter(
+    (x) => x !== undefined,
+  ).length;
+
+  if (provided !== 1) {
+    throw new DailySelectionError(
+      "Provide exactly one of date, dayOffset, dayIndex",
+    );
+  }
+
+  if (t.dayIndex !== undefined) {
+    if (!Number.isInteger(t.dayIndex) || t.dayIndex < 0) {
+      throw new DailySelectionError("dayIndex must be a non-negative integer");
+    }
+    return t.dayIndex;
+  }
+
+  if (t.dayOffset !== undefined) {
+    if (!Number.isInteger(t.dayOffset) || t.dayOffset < 1) {
+      throw new DailySelectionError("dayOffset must be an integer >= 1");
+    }
+    return today + t.dayOffset;
+  }
+
+  if (!isRealDayLength()) {
+    throw new DailySelectionError(
+      "DAY_PERIOD_MS override is active: schedule by dayIndex, not date",
+    );
+  }
+  return dayIndexForDate(t.date as string);
 }
 
 type DbLike = typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0];
@@ -142,13 +207,26 @@ export async function getActiveTaskIds(
 export async function getDailySelectionStatus(at: Date = new Date()) {
   const today = currentDayIndex(at);
   const latest = await latestSelectionDayIndex(today);
+  // `today` + `realDays` + `dayPeriodMs` let the admin UI know whether to
+  // offer a date picker (real days) or a day-index input (staging).
+  const meta = {
+    today,
+    realDays: isRealDayLength(),
+    dayPeriodMs: timeframes.dayPeriodMs,
+  };
   if (latest === null) {
-    return { dayIndex: today, isToday: false, tasks: [] as ActiveTask[] };
+    return {
+      dayIndex: today,
+      isToday: false,
+      tasks: [] as ActiveTask[],
+      ...meta,
+    };
   }
   return {
     dayIndex: latest,
     isToday: latest === today,
     tasks: await selectionForDay(latest),
+    ...meta,
   };
 }
 
@@ -185,14 +263,26 @@ export async function createtask(params: CreateTaskParams) {
   return task;
 }
 
-export function formatDailyTasksAnnouncement(tasks: ActiveTask[]): string {
+/**
+ * `dayIndex` is optional so existing callers are unchanged. When provided and
+ * a day is NOT 24h (staging), the header names the staging day so every
+ * 5-minute broadcast is distinguishable and clearly not a real calendar day.
+ */
+export function formatDailyTasksAnnouncement(
+  tasks: ActiveTask[],
+  dayIndex?: number,
+): string {
   const lines = tasks
     .map(
       (t, i) =>
         `${i + 1}. ${t.title} (+${t.basePoints} pts)${t.isHighValue ? " ⭐" : ""}`,
     )
     .join("\n");
-  return `📋 Today's tasks are live!\n\n${lines}\n\nOpen /tasks to get started.`;
+  const header =
+    dayIndex !== undefined && !isRealDayLength()
+      ? `📋 Day ${dayIndex} tasks are live! (staging)`
+      : `📋 Today's tasks are live!`;
+  return `${header}\n\n${lines}\n\nOpen /tasks to get started.`;
 }
 
 /** Sync checks: size cap and duplicates. Returns the de-duplicated list. */
@@ -291,20 +381,28 @@ export async function setDailyTaskSelection(
 export type ScheduledTask = ActiveTask & { active: boolean };
 
 /**
- * Set (replace) the schedule for a future date. An empty `taskIds` clears the
- * schedule for that date. Today and past dates are rejected: today's set is
- * managed through setDailyTaskSelection.
+ * Set (replace) the schedule for a future day. `target` is a calendar date
+ * (real 24h days) or a `{ dayIndex }` (required when DAY_PERIOD_MS is
+ * overridden). An empty `taskIds` clears the schedule for that day. Today and
+ * past days are rejected: today's set is managed through
+ * setDailyTaskSelection.
  */
 export async function setScheduledSelection(
-  date: string,
+  target: ScheduleTarget,
   taskIds: string[],
   createdBy: string,
   at: Date = new Date(),
-): Promise<{ date: string; dayIndex: number; taskIds: string[] }> {
-  const dayIndex = dayIndexForDate(date);
-  if (dayIndex <= currentDayIndex(at)) {
+): Promise<{
+  date: string;
+  dayIndex: number;
+  startsAt: string;
+  taskIds: string[];
+}> {
+  const today = currentDayIndex(at);
+  const dayIndex = resolveScheduleDayIndex(target, today);
+  if (dayIndex <= today) {
     throw new DailySelectionError(
-      "Schedule date must be after today; use the daily selection for today",
+      "Schedule day must be after today; use the daily selection for today",
     );
   }
   const uniqueIds = normalizeTaskIds(taskIds);
@@ -328,7 +426,12 @@ export async function setScheduledSelection(
     }
   });
 
-  return { date, dayIndex, taskIds: uniqueIds };
+  return {
+    date: dateForDayIndex(dayIndex),
+    dayIndex,
+    startsAt: dayStartsAt(dayIndex).toISOString(),
+    taskIds: uniqueIds,
+  };
 }
 
 /** Upcoming dated schedules (after today), soonest first. */
@@ -361,6 +464,8 @@ export async function listScheduledSelections(at: Date = new Date()) {
   return Array.from(byDay, ([dayIndex, dayTasks]) => ({
     dayIndex,
     date: dateForDayIndex(dayIndex),
+    startsAt: dayStartsAt(dayIndex).toISOString(),
+    daysFromNow: dayIndex - today,
     tasks: dayTasks,
   }));
 }
@@ -444,7 +549,8 @@ export async function runDailyRollover(at: Date = new Date()) {
 
   return {
     source: result.source,
+    dayIndex: result.dayIndex,
     tasks: todays,
-    message: formatDailyTasksAnnouncement(todays),
+    message: formatDailyTasksAnnouncement(todays, result.dayIndex),
   };
 }
