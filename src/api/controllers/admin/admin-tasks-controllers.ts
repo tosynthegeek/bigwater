@@ -4,18 +4,15 @@ import {
   DailySelectionError,
   formatDailyTasksAnnouncement,
   getDailySelectionStatus,
-  getWeeklyTemplate,
   listScheduledSelections,
   setDailyTaskSelection,
   setScheduledSelection,
-  setWeeklyTemplateDay,
 } from "@/services/tasks";
 import { db } from "@/db";
 import { submissions, tasks, type User } from "@/db/schema/rail2";
 import {
   createTaskSchema,
   setTaskScheduleSchema,
-  setWeeklyTemplateSchema,
   updateTaskSchema,
 } from "@/zod/task";
 import { setDailyTaskSelectionSchema } from "@/zod/task";
@@ -110,10 +107,10 @@ export async function deactivateTask(c: Context) {
 
     // Deactivating a task that's part of the live selection (today's, or the
     // most recent one carried forward) silently shrinks the live list below 5
-    // — selectionForDay filters on tasks.active. Scheduled and weekly-template
-    // entries for this task are skipped when their day is materialized. That's
-    // intentional (deactivateTask elsewhere in the codebase has no separate
-    // "unpublish" step) but worth surfacing to whoever reviews the audit log.
+    // — selectionForDay filters on tasks.active. A scheduled entry for this
+    // task is skipped when its day is materialized. That's intentional
+    // (deactivateTask elsewhere in the codebase has no separate "unpublish"
+    // step) but worth surfacing to whoever reviews the audit log.
     setAuditMeta(c, { title: deactivatedTask?.title });
 
     return c.json({ task: deactivatedTask });
@@ -163,9 +160,9 @@ export async function deleteTask(c: Context) {
       );
     }
 
-    // daily_task_selections, scheduled_task_selections and
-    // weekly_task_templates reference tasks with ON DELETE CASCADE, so this
-    // also removes the task from any selection, schedule or weekly template.
+    // daily_task_selections and scheduled_task_selections reference tasks
+    // with ON DELETE CASCADE, so this also removes the task from any
+    // selection or schedule.
     await db.delete(tasks).where(eq(tasks.id, taskId));
 
     setAuditMeta(c, { title: existingTask.title });
@@ -319,51 +316,6 @@ export async function setTaskSchedule(c: Context) {
       return c.json({ error: error.message }, 400);
     }
     console.error("AdminTasks.Controllers.setTaskSchedule.error:", error);
-    return c.json({ error: "Internal server error" }, 500);
-  }
-}
-
-export async function getWeeklyTaskTemplate(c: Context) {
-  try {
-    const days = await getWeeklyTemplate();
-    return c.json({ days }, 200);
-  } catch (error) {
-    console.error("AdminTasks.Controllers.getWeeklyTaskTemplate.error:", error);
-    return c.json({ error: "Internal server error" }, 500);
-  }
-}
-
-export async function setWeeklyTaskTemplate(c: Context) {
-  const admin = c.get("user") as User;
-
-  const body = await c.req.json().catch(() => null);
-  const validated = setWeeklyTemplateSchema.safeParse(body);
-  if (!validated.success) {
-    return c.json(
-      { error: "Invalid request body", details: validated.error.issues },
-      400,
-    );
-  }
-
-  try {
-    const result = await setWeeklyTemplateDay(
-      validated.data.weekday,
-      validated.data.taskIds,
-      admin.id,
-    );
-
-    setAuditMeta(c, {
-      weekday: result.weekday,
-      taskIds: result.taskIds,
-      cleared: result.taskIds.length === 0,
-    });
-
-    return c.json(result, 200);
-  } catch (error) {
-    if (error instanceof DailySelectionError) {
-      return c.json({ error: error.message }, 400);
-    }
-    console.error("AdminTasks.Controllers.setWeeklyTaskTemplate.error:", error);
     return c.json({ error: "Internal server error" }, 500);
   }
 }
