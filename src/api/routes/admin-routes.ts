@@ -5,9 +5,12 @@ import {
   activateTask,
   createTask,
   deactivateTask,
+  deleteTask,
   getAllTasks,
   getDailyTaskSelection,
+  getTaskSchedule,
   setDailyTasks,
+  setTaskSchedule,
   updateTask,
 } from "@/api/controllers/admin/admin-tasks-controllers";
 import {
@@ -96,11 +99,27 @@ AdminRouter.patch(
     targetParam: "id",
   }),
 );
+AdminRouter.delete(
+  "/tasks/:id",
+  withAudit("task.delete", deleteTask, {
+    targetType: "task",
+    targetParam: "id",
+  }),
+);
 AdminRouter.get("/tasks/daily-selection", getDailyTaskSelection);
 AdminRouter.post(
   "/tasks/daily-selection",
   withAudit("task.daily_selection.set", setDailyTasks, {
     targetType: "daily_task_selection",
+  }),
+);
+
+// Dated schedule: body { date: "YYYY-MM-DD", taskIds: [...] } (empty = clear)
+AdminRouter.get("/tasks/schedule", getTaskSchedule);
+AdminRouter.post(
+  "/tasks/schedule",
+  withAudit("task.schedule.set", setTaskSchedule, {
+    targetType: "scheduled_task_selection",
   }),
 );
 

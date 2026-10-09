@@ -12,12 +12,15 @@ import { morningNotificationWorker } from "../workers/morning-notification.worke
 import { scheduleMorningNotification } from "./morning-notification.queue";
 import { logger } from "@/utils/logger";
 import { participantNotificationWorker } from "../workers/participant-notification.worker";
+import { dailyRolloverWorker } from "../workers/daily-rollover.worker";
+import { scheduleDailyRollover } from "./daily-rollover.queue";
 
 const log = logger.child({ source: "queues" });
 
 export async function startQueues() {
   await scheduleBankingSweep();
   await scheduleStreakSweep();
+  await scheduleDailyRollover();
   await scheduleHealthCheck();
   await scheduleMorningNotification();
 
@@ -29,6 +32,7 @@ export async function stopQueues() {
     bankingSweepWorker.close(),
     bankingWorker.close(),
     streakSweepWorker.close(),
+    dailyRolloverWorker.close(),
     submissionEvaluationWorker.close(),
     notificationWorker.close(),
     telegramMarketingWorker.close(),
