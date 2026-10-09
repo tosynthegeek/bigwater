@@ -43,9 +43,12 @@ export function resolveTallyPeriodMs(): number {
   return 10 * ONE_MINUTE; // staging/dev default — override via TALLY_PERIOD_MS
 }
 
+// Callers that treat 0 as "calendar mode" (getTallyPeriod, getWeekPeriod)
+// already branch on `> 0` before calling this, so rejecting 0 here is safe:
+// it only turns a would-be Infinity/NaN index into a loud error.
 export function periodIndex(date: Date, periodMs: number) {
-  if (periodMs < 0) {
-    throw new Error("periodMs must be a positive number");
+  if (!Number.isFinite(periodMs) || periodMs <= 0) {
+    throw new Error("periodMs must be a positive finite number");
   }
   return Math.floor(date.getTime() / periodMs);
 }
