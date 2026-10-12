@@ -255,10 +255,10 @@ export async function createtask(params: CreateTaskParams) {
     throw new Error("Failed to create task");
   }
 
-  taskQueue.add("task-notification", {
-    taskTitle: task.title,
-    taskDescription: task.description,
-  });
+  // taskQueue.add("task-notification", {
+  //   taskTitle: task.title,
+  //   taskDescription: task.description,
+  // });
 
   return task;
 }
