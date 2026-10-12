@@ -13,9 +13,9 @@ import { submissions, tasks, type User } from "@/db/schema/rail2";
 import {
   createTaskSchema,
   setTaskScheduleSchema,
+  setDailyTaskSelectionSchema,
   updateTaskSchema,
 } from "@/zod/task";
-import { setDailyTaskSelectionSchema } from "@/zod/task";
 import { count, eq } from "drizzle-orm";
 import { setAuditMeta } from "@/services/logger/audit";
 import { telegramMarketingQueue } from "@/services/queues/telegram-marketing.queue";

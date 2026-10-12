@@ -280,7 +280,7 @@ export function formatDailyTasksAnnouncement(
     .join("\n");
   const header =
     dayIndex !== undefined && !isRealDayLength()
-      ? `📋 Day ${dayIndex} tasks are live! (staging)`
+      ? `📋 Tasks for ${dayStartsAt(dayIndex).toISOString().slice(11, 16)} UTC are live!`
       : `📋 Today's tasks are live!`;
   return `${header}\n\n${lines}\n\nOpen /tasks to get started.`;
 }
