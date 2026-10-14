@@ -57,6 +57,13 @@
       "when": 1790668533100,
       "tag": "0007_overrated_triathlon",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1791971789395,
+      "tag": "0008_parched_butterfly",
+      "breakpoints": true
     }
   ]
 }
