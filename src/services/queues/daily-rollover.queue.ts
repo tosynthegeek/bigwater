@@ -17,7 +17,7 @@ export async function scheduleDailyRollover() {
     {},
     {
       repeat: {
-        every: Number(process.env.DAILY_ROLLOVER_INTERVAL_MS ?? 60_000),
+        every: Number(process.env.DAILY_ROLLOVER_INTERVAL_MS ?? 300000),
       },
       jobId: "daily-rollover",
     },

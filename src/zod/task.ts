@@ -29,10 +29,29 @@ export const setDailyTaskSelectionSchema = z.object({
   notify: z.boolean().optional(),
 });
 
-// Dated schedule. An empty taskIds array clears the schedule for that date.
-export const setTaskScheduleSchema = z.object({
-  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD"),
-  taskIds: z
-    .array(z.string().min(1))
-    .max(MAX_DAILY_TASKS, `Cannot select more than ${MAX_DAILY_TASKS} tasks`),
-});
+// Scheduled selection. An empty taskIds array clears the schedule for that
+// day. Exactly one target must be given:
+//   - date:      "YYYY-MM-DD" (real 24h days; the service rejects it when
+//                DAY_PERIOD_MS is overridden)
+//   - dayOffset: periods from the current one (1 = next period)
+//   - dayIndex:  absolute day index
+// Environment-dependent rules (is `date` allowed? is the target in the
+// future?) are enforced in the service, not here.
+export const setTaskScheduleSchema = z
+  .object({
+    date: z
+      .string()
+      .regex(/^\d{4}-\d{2}-\d{2}$/, "Use YYYY-MM-DD")
+      .optional(),
+    dayOffset: z.number().int().min(1).optional(),
+    dayIndex: z.number().int().nonnegative().optional(),
+    taskIds: z
+      .array(z.string().min(1))
+      .max(MAX_DAILY_TASKS, `Cannot select more than ${MAX_DAILY_TASKS} tasks`),
+  })
+  .refine(
+    (v) =>
+      [v.date, v.dayOffset, v.dayIndex].filter((x) => x !== undefined)
+        .length === 1,
+    { message: "Provide exactly one of: date, dayOffset, dayIndex" },
+  );

@@ -13,9 +13,9 @@ import { submissions, tasks, type User } from "@/db/schema/rail2";
 import {
   createTaskSchema,
   setTaskScheduleSchema,
+  setDailyTaskSelectionSchema,
   updateTaskSchema,
 } from "@/zod/task";
-import { setDailyTaskSelectionSchema } from "@/zod/task";
 import { count, eq } from "drizzle-orm";
 import { setAuditMeta } from "@/services/logger/audit";
 import { telegramMarketingQueue } from "@/services/queues/telegram-marketing.queue";
@@ -298,14 +298,14 @@ export async function setTaskSchedule(c: Context) {
   }
 
   try {
-    const result = await setScheduledSelection(
-      validated.data.date,
-      validated.data.taskIds,
-      admin.id,
-    );
+    // Real days: send `date`. Staging (DAY_PERIOD_MS overridden): send
+    // `dayOffset` or `dayIndex` — the service rejects `date` there.
+    const { taskIds, ...target } = validated.data;
+    const result = await setScheduledSelection(target, taskIds, admin.id);
 
     setAuditMeta(c, {
       date: result.date,
+      dayIndex: result.dayIndex,
       taskIds: result.taskIds,
       cleared: result.taskIds.length === 0,
     });
