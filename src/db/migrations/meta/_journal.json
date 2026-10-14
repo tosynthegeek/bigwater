@@ -57,6 +57,13 @@
       "when": 1790668533100,
       "tag": "0007_overrated_triathlon",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1791971040622,
+      "tag": "0008_sturdy_victor_mancha",
+      "breakpoints": true
     }
   ]
 }
