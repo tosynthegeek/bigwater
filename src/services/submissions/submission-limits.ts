@@ -93,7 +93,7 @@ export async function enforceSubmissionLimits(
         eq(submissions.userId, userId),
         gte(submissions.createdAt, periodStart),
         lt(submissions.createdAt, periodEnd),
-        or(eq(tasks.isHighValue, false), ne(submissions.status, "rejected")),
+        ne(submissions.status, "rejected"),
       ),
     );
 
@@ -179,7 +179,7 @@ export async function getSubmissionLimitStatus(userId: string) {
           eq(submissions.userId, userId),
           gte(submissions.createdAt, periodStart),
           lt(submissions.createdAt, periodEnd),
-          or(eq(tasks.isHighValue, false), ne(submissions.status, "rejected")),
+          ne(submissions.status, "rejected"),
         ),
       ),
 
