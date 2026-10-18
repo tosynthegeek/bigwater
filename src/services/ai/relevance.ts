@@ -121,6 +121,13 @@ async function callModelForRelevance(
     ),
   });
 
+  if (!completion.choices?.length) {
+    const body = (completion as { error?: unknown }).error ?? completion;
+    throw new Error(
+      `OpenRouter returned no choices (model=${model}, mediaType=${mediaType}): ${JSON.stringify(body).slice(0, 500)}`,
+    );
+  }
+
   const rawResponse = completion.choices[0]?.message?.content ?? "{}";
 
   return relevanceSchema.parse(extractJson(rawResponse));
