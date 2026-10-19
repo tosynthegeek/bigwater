@@ -1,6 +1,12 @@
 import OpenAI from "openai";
 import z from "zod";
 
+const FALLBACK_MODELS = [
+  "openai/gpt-5.4-nano",
+  "google/gemini-2.5-flash-lite",
+  "anthropic/claude-sonnet-4.6",
+];
+
 const openrouter = new OpenAI({
   apiKey: Bun.env.OPENROUTER_API_KEY,
   baseURL: "https://openrouter.ai/api/v1",
@@ -110,8 +116,11 @@ async function callModelForRelevance(
   taskDescription: string,
   taskTitle: string,
 ) {
-  const completion = await openrouter.chat.completions.create({
+  // `models` is an OpenRouter extension, not in the OpenAI SDK's types, so it
+  // is built as a variable instead of an inline literal to avoid a TS error.
+  const params = {
     model,
+    models: FALLBACK_MODELS.filter((m) => m !== model),
     max_tokens: 200,
     messages: buildRelevanceMessages(
       base64,
@@ -119,8 +128,12 @@ async function callModelForRelevance(
       taskDescription,
       taskTitle,
     ),
-  });
+  };
 
+  const completion = await openrouter.chat.completions.create(params);
+
+  // OpenRouter can return HTTP 200 with only an `error` object and no `choices`
+  // when the upstream provider fails after accepting the request.
   if (!completion.choices?.length) {
     const body = (completion as { error?: unknown }).error ?? completion;
     throw new Error(
