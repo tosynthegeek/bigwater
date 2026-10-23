@@ -16,7 +16,14 @@ export async function checkAiGenerated(image: File) {
     method: "POST",
     body: form,
   });
-  if (!res.ok) throw new Error(`Sightengine request failed: ${res.status}`);
+  if (!res.ok) {
+    // Sightengine's 4xx/5xx bodies carry { error: { type, code, message } }
+    // (e.g. argument_error "Incorrect API user or API secret", media_error,
+    // plan_error). Without it a 400 is undiagnosable.
+    throw new Error(
+      `Sightengine request failed: ${res.status} ${await describeErrorBody(res)}`,
+    );
+  }
 
   const json = await res.json();
   const parsed = sightengineResponseSchema.parse(json);
@@ -37,4 +44,24 @@ export async function checkAiGenerated(image: File) {
         : `Image appears authentic (${Math.round(aiGenProbability * 100)}% AI-generation probability).`;
 
   return { score, sentence };
+}
+
+async function describeErrorBody(res: Response): Promise<string> {
+  try {
+    const text = await res.text();
+    try {
+      const body = JSON.parse(text) as {
+        error?: { type?: string; code?: number; message?: string };
+      };
+      if (body.error) {
+        const { type, code, message } = body.error;
+        return `(${type ?? "unknown_error"}/${code ?? "?"}: ${message ?? "no message"})`;
+      }
+    } catch {
+      // not JSON — fall through to the raw text
+    }
+    return `(body: ${text.slice(0, 300)})`;
+  } catch {
+    return "(could not read response body)";
+  }
 }

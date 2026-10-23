@@ -38,11 +38,32 @@ function dedupKey(alert: CriticalAlert): string {
 
 function errorToText(error: unknown): string {
   if (!error) return "";
-  if (error instanceof Error) return error.stack ?? error.message;
+  if (error instanceof Error) {
+    // Drizzle wraps the real driver/Postgres error in `.cause` and its own
+    // message is just "Failed query: ...", so walk the chain or the alert
+    // never shows why the query actually failed.
+    const parts: string[] = [error.stack ?? error.message];
+    let cause: unknown = error.cause;
+    for (let depth = 0; cause && depth < 5; depth++) {
+      parts.push(
+        `Caused by: ${
+          cause instanceof Error
+            ? (cause.stack ?? cause.message)
+            : safeStringify(cause)
+        }`,
+      );
+      cause = cause instanceof Error ? cause.cause : undefined;
+    }
+    return parts.join("\n");
+  }
+  return safeStringify(error);
+}
+
+function safeStringify(value: unknown): string {
   try {
-    return JSON.stringify(error);
+    return JSON.stringify(value);
   } catch {
-    return String(error);
+    return String(value);
   }
 }
 
