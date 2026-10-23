@@ -1,5 +1,6 @@
 import { Queue } from "bullmq";
 import { makeConnection } from "@/redis";
+import { scheduleRepeatable } from "../schedule";
 
 export type SweepJobData = Record<string, never>;
 
@@ -8,12 +9,10 @@ export const streakSweepQueue = new Queue<SweepJobData>("streak-sweep", {
 });
 
 export async function scheduleStreakSweep() {
-  await streakSweepQueue.add(
+  await scheduleRepeatable(
+    streakSweepQueue,
     "sweep",
-    {},
-    {
-      repeat: { every: Number(process.env.STREAK_SWEEP_INTERVAL_MS ?? 60_000) },
-      jobId: "streak-sweep",
-    },
+    "streak-sweep",
+    Number(process.env.STREAK_SWEEP_INTERVAL_MS ?? 60_000),
   );
 }

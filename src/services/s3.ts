@@ -42,7 +42,6 @@ export async function uploadFileToS3(
     Bucket: AWS_BUCKET_NAME,
     Key: `${key}.${extension}`,
     ContentType: detectedMime,
-    ContentEncoding: "base64",
     Body: object,
   });
 

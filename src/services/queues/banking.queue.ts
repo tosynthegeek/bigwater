@@ -1,5 +1,6 @@
 import { Queue, QueueEvents } from "bullmq";
 import { makeConnection } from "@/redis";
+import { scheduleRepeatable } from "../schedule";
 
 export type SweepJobData = Record<string, never>;
 export type BankJobData = { userId: string; month: string };
@@ -15,14 +16,13 @@ export const bankingQueueEvents = new QueueEvents("banking", {
 });
 
 export async function scheduleBankingSweep() {
-  await bankingSweepQueue.add(
+  // Fixed jobId — re-adding just updates the schedule, doesn't duplicate it.
+  // The sweep is idempotent (per-user bank jobs are deduped by jobId), so it
+  // is safe to retry.
+  await scheduleRepeatable(
+    bankingSweepQueue,
     "sweep",
-    {},
-    {
-      repeat: {
-        every: Number(process.env.BANKING_SWEEP_INTERVAL_MS ?? 60_000),
-      },
-      jobId: "tally-sweep", // fixed id — re-adding just updates the schedule, doesn't duplicate it
-    },
+    "tally-sweep",
+    Number(process.env.BANKING_SWEEP_INTERVAL_MS ?? 60_000),
   );
 }

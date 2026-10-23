@@ -1,5 +1,6 @@
 import { Queue } from "bullmq";
 import { makeConnection } from "@/redis";
+import { scheduleRepeatable } from "../schedule";
 
 export type RolloverJobData = Record<string, never>;
 
@@ -12,14 +13,10 @@ export const dailyRolloverQueue = new Queue<RolloverJobData>("daily-rollover", {
 // after the day boundary (including with a DAY_PERIOD_MS override) and
 // catches up after downtime.
 export async function scheduleDailyRollover() {
-  await dailyRolloverQueue.add(
+  await scheduleRepeatable(
+    dailyRolloverQueue,
     "rollover",
-    {},
-    {
-      repeat: {
-        every: Number(process.env.DAILY_ROLLOVER_INTERVAL_MS ?? 300000),
-      },
-      jobId: "daily-rollover",
-    },
+    "daily-rollover",
+    Number(process.env.DAILY_ROLLOVER_INTERVAL_MS ?? 300000),
   );
 }
